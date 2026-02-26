@@ -1,9 +1,17 @@
-import { Collection, Document, Filter, ObjectId, OptionalUnlessRequiredId, WithId } from 'mongodb';
+import {
+  Collection,
+  Document,
+  Filter,
+  ObjectId,
+  OptionalUnlessRequiredId,
+  WithId,
+} from 'mongodb';
 import { BaseRepository } from '../types/BaseRepository.abstact';
 import { BaseEntity } from '../types/BaseEntity.abstact';
 
-
-export class BaseMongoRepository<T extends BaseEntity> implements BaseRepository<T> {
+export class BaseMongoRepository<
+  T extends BaseEntity,
+> implements BaseRepository<T> {
   constructor(protected collection: Collection) {}
 
   async create(data: Omit<T, 'id'>): Promise<string> {
@@ -11,9 +19,11 @@ export class BaseMongoRepository<T extends BaseEntity> implements BaseRepository
       const doc = {
         ...data,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
-      const result = await this.collection.insertOne(doc as OptionalUnlessRequiredId<Document>);
+      const result = await this.collection.insertOne(
+        doc as OptionalUnlessRequiredId<Document>,
+      );
       return result.insertedId.toString();
     } catch (error) {
       throw new Error(`Failed to create document: ${error.message}`);
@@ -24,7 +34,7 @@ export class BaseMongoRepository<T extends BaseEntity> implements BaseRepository
     try {
       const mongoFilter = this.mapToMongoFilter(filter || {});
       const results = await this.collection.find(mongoFilter).toArray();
-      return results.map(doc => this.mapToEntity(doc));
+      return results.map((doc) => this.mapToEntity(doc));
     } catch (error) {
       throw new Error(`Failed to find documents: ${error.message}`);
     }
@@ -45,12 +55,11 @@ export class BaseMongoRepository<T extends BaseEntity> implements BaseRepository
       const mongoFilter = this.mapToMongoFilter(filter);
       const updateData = {
         ...data,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
-      const result = await this.collection.updateOne(
-        mongoFilter, 
-        { $set: updateData }
-      );
+      const result = await this.collection.updateOne(mongoFilter, {
+        $set: updateData,
+      });
       return result.modifiedCount > 0;
     } catch (error) {
       throw new Error(`Failed to update document: ${error.message}`);
@@ -69,12 +78,12 @@ export class BaseMongoRepository<T extends BaseEntity> implements BaseRepository
 
   protected mapToMongoFilter(filter: Partial<T>): Filter<Document> {
     const mongoFilter: Filter<Document> = {};
-    
+
     if (filter.id) {
       mongoFilter._id = new ObjectId(filter.id);
       delete filter.id;
     }
-    
+
     return { ...mongoFilter, ...filter };
   }
 
@@ -82,7 +91,7 @@ export class BaseMongoRepository<T extends BaseEntity> implements BaseRepository
     const { _id, ...rest } = doc;
     return {
       id: _id.toString(),
-      ...rest
+      ...rest,
     } as T;
   }
 }

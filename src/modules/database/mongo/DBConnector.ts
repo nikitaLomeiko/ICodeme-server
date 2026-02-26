@@ -4,7 +4,10 @@ import { IDBConnector } from '../types/DBConnector.type';
 export class DBConnector implements IDBConnector<MongoClient> {
   client: MongoClient;
 
-  constructor(private uri: string, private dbName: string = 'db') {
+  constructor(
+    private uri: string,
+    private dbName: string = 'db',
+  ) {
     this.client = new MongoClient(this.uri);
   }
 

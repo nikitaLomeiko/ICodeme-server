@@ -1,5 +1,5 @@
 import { Module, Global } from '@nestjs/common';
-import { DBConnector } from './mongo/DBConnector';
+import { DBConnector } from '@modules/database/mongo/DBConnector';
 
 @Global()
 @Module({
@@ -10,8 +10,8 @@ import { DBConnector } from './mongo/DBConnector';
         const uri = process.env.DB_URL;
         const dbname = process.env.DB_NAME;
 
-        if(!uri){
-            throw new Error('DB_URL is not defined in environment variables');
+        if (!uri) {
+          throw new Error('DB_URL is not defined in environment variables');
         }
 
         const connector = new DBConnector(uri);
