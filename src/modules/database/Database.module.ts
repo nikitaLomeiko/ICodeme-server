@@ -1,5 +1,5 @@
 import { Module, Global } from '@nestjs/common';
-import { DBConnector } from '@modules/database/mongo/DBConnector';
+import { DBConnector } from '@modules/DataBase/mongo/DBConnector';
 
 @Global()
 @Module({
