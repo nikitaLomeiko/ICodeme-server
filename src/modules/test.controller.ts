@@ -10,17 +10,22 @@ export class TestController {
 
   @Get()
   async testEndpoint() {
-    const collection = await CreateScheme(this.db, 'users', {
-      name: { bsonType: 'string', description: 'Имя пользователя' },
-      email: { bsonType: 'string', description: 'Email пользователя' },
-    }, ['name', 'email']);
+    const collection = await CreateScheme(this.db, 'user_tests', {
+      test: { type: 'string', isRequired: true },
+      email: { type: 'string', isRequired: true },
+    });
 
-    const userRepo = new BaseMongoRepository<{ name: string; email: string, id: string; createdAt?: Date; updatedAt?: Date }>(collection);
+    const userRepo = new BaseMongoRepository<{
+      test: string;
+      email: string;
+      id: string;
+      createdAt?: Date;
+      updatedAt?: Date;
+    }>(collection);
 
-    // Используем репозиторий
-    const newUser = await userRepo.create({ 
-      name: 'John Doe', 
-      email: 'john.doe@example.com' 
+    const newUser = await userRepo.create({
+      test: 'John Doe',
+      email: 'john.doe@example.com',
     });
 
     return {

@@ -1,6 +1,6 @@
 import { Collection, Document, Filter, ObjectId, OptionalUnlessRequiredId, WithId } from 'mongodb';
-import { BaseRepository } from '../abstracts/BaseRepository.abstact';
-import { BaseEntity } from '../abstracts/BaseEntity.abstact';
+import { BaseRepository } from '../types/BaseRepository.abstact';
+import { BaseEntity } from '../types/BaseEntity.abstact';
 
 
 export class BaseMongoRepository<T extends BaseEntity> implements BaseRepository<T> {
