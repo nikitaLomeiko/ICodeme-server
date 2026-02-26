@@ -1,10 +1,9 @@
-import { DatabaseModule } from '@core/db/Database.module';
-import { TestController } from '@modules/test.controller';
+import { DatabaseModule } from '@modules/database/Database.module';
 import { Module } from '@nestjs/common';
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [TestController],
+  controllers: [],
   providers: [],
 })
 export class AppModule {}
