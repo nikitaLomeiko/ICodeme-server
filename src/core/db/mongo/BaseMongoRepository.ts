@@ -3,18 +3,19 @@ import {
   Document,
   Filter,
   ObjectId,
+  OptionalId,
   OptionalUnlessRequiredId,
   WithId,
 } from 'mongodb';
+import { BaseEntity } from '@core/types/BaseEntity.abstract';
 import { BaseRepository } from '../types/BaseRepository.abstact';
-import { BaseEntity } from '../types/BaseEntity.abstact';
 
 export class BaseMongoRepository<
   T extends BaseEntity,
 > implements BaseRepository<T> {
   constructor(protected collection: Collection) {}
 
-  async create(data: Omit<T, 'id'>): Promise<string> {
+  async create(data: T): Promise<string> {
     try {
       const doc = {
         ...data,
@@ -22,7 +23,7 @@ export class BaseMongoRepository<
         updatedAt: new Date(),
       };
       const result = await this.collection.insertOne(
-        doc as OptionalUnlessRequiredId<Document>,
+        doc as unknown as OptionalId<Document>,
       );
       return result.insertedId.toString();
     } catch (error) {
@@ -79,18 +80,22 @@ export class BaseMongoRepository<
   protected mapToMongoFilter(filter: Partial<T>): Filter<Document> {
     const mongoFilter: Filter<Document> = {};
 
-    if (filter.id) {
-      mongoFilter._id = new ObjectId(filter.id);
-      delete filter.id;
+    for (const [key, value] of Object.entries(filter)) {
+      if (key === 'id') {
+        mongoFilter._id = value;
+      } else {
+        mongoFilter[key] = value;
+      }
     }
 
-    return { ...mongoFilter, ...filter };
+    return mongoFilter;
   }
 
   protected mapToEntity(doc: WithId<Document>): T {
     const { _id, ...rest } = doc;
+
     return {
-      id: _id.toString(),
+      _id: _id.toString(),
       ...rest,
     } as T;
   }
