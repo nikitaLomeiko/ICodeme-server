@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { Db, ObjectId } from 'mongodb';
+import { Db } from 'mongodb';
 import * as bcrypt from 'bcrypt';
 import config from '@core/config/jwt/jwt.config';
 
