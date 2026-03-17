@@ -1,0 +1,212 @@
+{
+  "main": {
+    "id": "512e6ae6717e590e",
+    "type": "split",
+    "children": [
+      {
+        "id": "9b73d607f2683fb0",
+        "type": "tabs",
+        "dimension": 80.07159904534606,
+        "children": [
+          {
+            "id": "33470a2621ad1b57",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Схема генерации модулей обученичя.canvas",
+                "viewState": {
+                  "x": 903.4134969318626,
+                  "y": -40.579716626795204,
+                  "zoom": -1.333333333333333
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "Схема генерации модулей обученичя"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f54fcc40452f251c",
+        "type": "tabs",
+        "dimension": 19.928400954653938,
+        "children": [
+          {
+            "id": "0b424f1775214f87",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Граф"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "4800a7139c805e6f",
+    "type": "split",
+    "children": [
+      {
+        "id": "e69a27f4cb79da61",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d5261703a6be948d",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Файловый менеджер"
+            }
+          },
+          {
+            "id": "066a2f29c3ee3731",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Поиск"
+            }
+          },
+          {
+            "id": "43125b9b8cd6c820",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Закладки"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "04593957ec7f336c",
+    "type": "split",
+    "children": [
+      {
+        "id": "ba086d58be8dc4a9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f3168b3f19cbf36a",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Схема генерации модулей обученичя.canvas",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Обратные ссылки для Схема генерации модулей обученичя"
+            }
+          },
+          {
+            "id": "579e5a85f97c19e9",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Схема генерации модулей обученичя.canvas",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Исходящие ссылки из Схема генерации модулей обученичя"
+            }
+          },
+          {
+            "id": "a164103a83553af1",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Теги"
+            }
+          },
+          {
+            "id": "70e6faac87eea0bf",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Все свойства"
+            }
+          },
+          {
+            "id": "69fbb0dba1640631",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Схема генерации модулей обученичя.canvas",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Структура Схема генерации модулей обученичя"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Меню быстрого перехода": false,
+      "graph:Граф": false,
+      "canvas:Создать новый холст": false,
+      "daily-notes:Сегодняшняя заметка": false,
+      "templates:Вставить шаблон": false,
+      "command-palette:Открыть палитру команд": false,
+      "bases:Создать новую базу": false
+    }
+  },
+  "active": "33470a2621ad1b57",
+  "lastOpenFiles": [
+    "Добро пожаловать.md",
+    "Схема генерации модулей обученичя.canvas"
+  ]
+}

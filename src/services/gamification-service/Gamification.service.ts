@@ -70,13 +70,16 @@ export class GamificationService {
   async nextLevelByUserId(id: string) {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
-    if (!profile) {
+    if (
+      !profile ||
+      profile.studyPlanJSON[profile.study.module - 1].levels === undefined
+    ) {
       throw new NotFoundException('Profile not found');
     }
 
     if (
       profile.study.level + 1 <
-      profile.studyPlanJSON[profile.study.module - 1].levels.length
+      (profile.studyPlanJSON[profile.study.module - 1].levels?.length || 0)
     ) {
       profile.study.level += 1;
       profile.study.step = 1;
@@ -98,12 +101,11 @@ export class GamificationService {
       throw new NotFoundException('Profile not found');
     }
 
-    if (
-      profile.study.step + 1 <
-      profile.studyPlanJSON[profile.study.module - 1].levels[
-        profile.study.level - 1
-      ].steps.length
-    ) {
+    const currentModule = profile.studyPlanJSON[profile.study.module - 1];
+    const currentLevel = currentModule?.levels?.[profile.study.level - 1];
+    const stepsLength = currentLevel?.steps?.length ?? 0;
+
+    if (profile.study.step + 1 < stepsLength) {
       profile.study.step += 1;
     }
 

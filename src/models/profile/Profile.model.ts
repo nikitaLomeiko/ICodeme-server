@@ -1,5 +1,6 @@
 import { BaseEntity } from '@core/types/BaseEntity.abstract';
 import { INotation } from '@core/types/Notation.type';
+import { IQuiz } from '@models/quiz/Quiz.model';
 
 export interface IProfile extends BaseEntity {
   userId: string;
@@ -36,17 +37,21 @@ export interface IStats {
 
 export interface IModule extends INotation {
   levels: ILevel[];
-  experience: number;
+  //experience: number;
 }
 
 export interface ILevel extends INotation {
   steps: IStep[];
-  experience: number;
+  //experience: number;
 }
 
 export interface IStep extends INotation {
-  type: 'document' | 'code' | 'test' | 'exam';
-  experience: number;
+  type: 'document' | 'code' | 'quiz' | 'exam';
+  document?: string;
+  code?: string;
+  quiz?: IQuiz;
+  exam?: IQuiz;
+  //experience: number;
 }
 
 export const ProfileKey = 'profiles';

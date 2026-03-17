@@ -3,10 +3,12 @@ import { Db } from 'mongodb';
 import { BaseMongoRepository } from '@core/db';
 import { generateId } from '@core/helpers/GenerateId';
 import {
+  IModule,
   IProfile,
   IProfileData,
   ProfileKey,
 } from '@models/profile/Profile.model';
+import { IResponse } from '@core/types/Response.type';
 
 @Injectable()
 export class ProfileService {
@@ -19,28 +21,35 @@ export class ProfileService {
     );
   }
 
-  async getProfileById(id: string) {
-    const profile = await this.repositoryProfile.find({ _id: id });
+  async getProfileById(id: string): Promise<IResponse<IProfile>> {
+    const profile = await this.repositoryProfile.findOne({ userId: id });
 
     if (!profile) {
-      throw new NotFoundException('Profile not found');
+      return { success: false, message: 'User not found' };
     }
 
-    return {
-      success: true,
-      data: profile,
-      message: 'Profile retrieved successfully',
-    };
+    return { success: true, data: profile };
   }
 
   async CreateNewProfile(
-    user: any,
+    user: { username: string; userId: string },
     data: IProfileData,
     programmingLanguage: string,
-  ) {
-    const profile: IProfile = {
-      _id: generateId(user.username),
-      userId: user.id,
+  ): Promise<IResponse<IProfile>> {
+    const profile = await this.repositoryProfile.findOne({
+      userId: user.userId,
+    });
+
+    if (profile) {
+      return {
+        success: false,
+        message: 'Profile has already been created',
+      };
+    }
+
+    const newProfile: IProfile = {
+      _id: generateId(user.userId),
+      userId: user.userId,
       data: data,
       levelPlanJSON: [],
       studyPlanJSON: [],
@@ -60,48 +69,62 @@ export class ProfileService {
       },
     };
 
-    const resultId = await this.repositoryProfile.create(profile);
+    await this.repositoryProfile.create(newProfile);
 
-    return {
-      success: true,
-      data: profile,
-      profileId: resultId,
-      message: 'Profile created successfully',
-    };
+    return { success: true, data: newProfile };
   }
 
-  async ChangeProfileDataById(data: IProfileData, id: string) {
-    const profile = await this.repositoryProfile.find({ _id: id });
+  async ChangeProfileDataById(
+    data: IProfileData,
+    id: string,
+  ): Promise<IResponse<IProfile>> {
+    const profile = await this.repositoryProfile.findOne({ userId: id });
 
     if (!profile) {
-      throw new NotFoundException('Profile not found');
+      return { success: false, message: 'User not found' };
     }
 
     const result = await this.repositoryProfile.update(
-      { _id: id },
+      { userId: id },
       { ...profile, data },
     );
 
     if (!result) {
-      throw new NotFoundException('Profile not found');
+      return { success: false, message: 'User not found' };
     }
 
-    return {
-      success: true,
-      message: 'Profile updated successfully',
-    };
+    return { success: true, data: { ...profile, data } };
+  }
+
+  async ChangeStudyPlanById(
+    data: IModule[],
+    id: string,
+  ): Promise<IResponse<IProfile>> {
+    const profile = await this.repositoryProfile.findOne({ userId: id });
+
+    if (!profile) {
+      return { success: false, message: 'User not found' };
+    }
+
+    const result = await this.repositoryProfile.update(
+      { userId: id },
+      { ...profile, studyPlanJSON: data },
+    );
+
+    if (!result) {
+      return { success: false, message: 'User not found' };
+    }
+
+    return { success: true, data: { ...profile, studyPlanJSON: data } };
   }
 
   async RemoveProfileById(id: string) {
-    const result = await this.repositoryProfile.delete({ _id: id });
+    const result = await this.repositoryProfile.delete({ userId: id });
 
     if (!result) {
-      throw new NotFoundException('Profile not found');
+      return { success: false, message: 'User not found' };
     }
 
-    return {
-      success: true,
-      message: 'Profile deleted successfully',
-    };
+    return { success: true };
   }
 }

@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+
+import { GeneralModule } from '@modules/general';
+
 import { AuthController } from './controllers/auth.controller';
-import { JwtStrategy, AuthService } from '@services/authService';
+import { AuthService } from '@services/authService';
 import config from '@core/config/jwt/jwt.config';
-import { DataBaseProvider } from '@core/db';
 
 import * as dotenv from 'dotenv';
 
@@ -17,9 +19,9 @@ dotenv.config();
       secret: config().secret,
       signOptions: { expiresIn: config().expiresIn },
     }),
+    GeneralModule,
   ],
-  providers: [DataBaseProvider, JwtStrategy, AuthService],
+  providers: [AuthService],
   controllers: [AuthController],
-  exports: [AuthService, JwtStrategy],
 })
 export class AuthModule {}

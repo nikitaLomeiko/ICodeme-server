@@ -1,12 +1,4 @@
-import {
-  Collection,
-  Document,
-  Filter,
-  ObjectId,
-  OptionalId,
-  OptionalUnlessRequiredId,
-  WithId,
-} from 'mongodb';
+import { Collection, Document, Filter, OptionalId, WithId } from 'mongodb';
 import { BaseEntity } from '@core/types/BaseEntity.abstract';
 import { BaseRepository } from '../types/BaseRepository.abstact';
 

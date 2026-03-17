@@ -5,102 +5,77 @@ import {
   Put,
   Delete,
   Body,
-  Param,
   Request,
   UseGuards,
   HttpCode,
   HttpStatus,
-  Query,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { IProfile, IProfileData } from '@models/profile/Profile.model';
+import { ProfileService } from '@services/profileService';
+import { IResponse } from '@core/types/Response.type';
 
 @Controller('profiles')
 @UseGuards(AuthGuard('jwt'))
-export class ProfilesController {
+export class ProfileController {
+  constructor(private readonly profileService: ProfileService) {}
+
   @Get('me')
-  async getMyProfile(@Request() req) {}
+  async getMyProfile(@Request() req): Promise<IResponse<IProfile>> {
+    const result = await this.profileService.getProfileById(req.user.userId);
+
+    if (!result.success) {
+      throw new NotFoundException(result.message);
+    }
+
+    return result;
+  }
 
   @Post('me')
-  async createOrUpdateMyProfile(
+  async createNewProfile(
     @Request() req,
     @Body() data: { profile: IProfileData; programmingLanguage: string },
-  ) {}
+  ): Promise<IResponse<IProfile>> {
+    const result = await this.profileService.CreateNewProfile(
+      req.user,
+      data.profile,
+      data.programmingLanguage,
+    );
+
+    if (!result.success) {
+      throw new BadRequestException(result.message);
+    }
+
+    return result;
+  }
 
   @Put('me')
   async updateMyProfile(
     @Request() req,
-    @Body() profileData: Partial<IProfile>,
-  ) {}
+    @Body() data: { profileData: IProfileData },
+  ): Promise<IResponse<IProfile>> {
+    const result = await this.profileService.ChangeProfileDataById(
+      data.profileData,
+      req.user.userId,
+    );
+
+    if (!result.success) {
+      throw new NotFoundException(result.message);
+    }
+
+    return result;
+  }
 
   @Delete('me')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteMyProfile(@Request() req) {}
+  async deleteMyProfile(@Request() req): Promise<IResponse> {
+    const result = await this.profileService.RemoveProfileById(req.user.userId);
 
-  // Получить профиль по ID пользователя (публичный профиль)
-  @Get('user/:userId')
-  async getProfileByUserId(@Param('userId') userId: string) {}
+    if (!result.success) {
+      throw new NotFoundException(result.message);
+    }
 
-  // Получить уровень пользователя
-  @Get('me/level')
-  async getMyLevel(@Request() req) {}
-
-  // Добавить опыт пользователю
-  @Post('me/level/experience')
-  async addExperience(
-    @Request() req,
-    @Body() body: { amount: number; source: string },
-  ) {}
-
-  // Получить достижения пользователя
-  @Get('me/achievements')
-  async getMyAchievements(@Request() req) {}
-
-  // Получить статистику пользователя
-  @Get('me/stats')
-  async getMyStats(@Request() req) {}
-
-  // Обновить настройки профиля
-  @Put('me/settings')
-  async updateSettings(@Request() req) {}
-
-  // Загрузить аватар
-  @Post('me/avatar')
-  async uploadAvatar(@Request() req, @Body() body: { avatarUrl: string }) {}
-
-  // Поиск профилей
-  @Get('search')
-  async searchProfiles(
-    @Query('query') searchQuery: string,
-    @Query('limit') limit: number = 20,
-    @Query('offset') offset: number = 0,
-  ) {}
-
-  // Получить топ пользователей по уровню/опыту
-  @Get('leaderboard')
-  async getLeaderboard(
-    @Query('period') period: 'daily' | 'weekly' | 'all' = 'all',
-    @Query('limit') limit: number = 10,
-  ) {}
-
-  // Добавить достижение пользователю (возможно, только для админов)
-  @Post(':userId/achievements')
-  @UseGuards(AuthGuard('jwt'))
-  async addAchievementToUser(
-    @Param('userId') userId: string,
-    @Body() body: { achievementId: string },
-  ) {}
-
-  // Обновить прогресс обучения
-  @Post('me/study/progress')
-  async updateStudyProgress(
-    @Request() req,
-    @Body()
-    progress: {
-      module: number;
-      level: number;
-      step: number;
-      completed?: boolean;
-    },
-  ) {}
+    return result;
+  }
 }

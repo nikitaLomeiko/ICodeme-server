@@ -12,6 +12,11 @@ import { IUser, UserKey } from '@models/user/User.model';
 import { BaseMongoRepository } from '@core/db';
 import { generateId } from '@core/helpers/GenerateId';
 import { JwtService } from '@nestjs/jwt';
+import {
+  IAuthResponse,
+  IAuthWithUserIdResponse,
+} from '@models/auth/AuthResponse.model';
+import { IResponse } from '@core/types/Response.type';
 
 @Injectable()
 export class AuthService {
@@ -34,13 +39,16 @@ export class AuthService {
     this.jwtHelper = new JwtHelper(this.jwtService);
   }
 
-  async login(email: string, password: string) {
+  async login(
+    email: string,
+    password: string,
+  ): Promise<IResponse<IAuthResponse>> {
     const existingUser = await this.repositoryUser.findOne({
       email: email,
     });
 
     if (!existingUser) {
-      throw new UnauthorizedException('Invalid credentials');
+      return { success: false, message: 'Invalid credentials' };
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -49,7 +57,7 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      return { success: false, message: 'Invalid credentials' };
     }
 
     const accessToken: string =
@@ -63,18 +71,24 @@ export class AuthService {
     this.repositoryRefreshToken.create(refreshToken);
 
     return {
-      accessToken,
-      refreshToken: refreshToken.token,
+      success: true,
+      data: {
+        token: accessToken,
+        refreshToken: refreshToken.token,
+      },
     };
   }
 
-  async register(userData: Omit<IUser, 'password_hash'>, password: string) {
+  async register(
+    userData: Omit<IUser, 'password_hash'>,
+    password: string,
+  ): Promise<IResponse<IAuthWithUserIdResponse>> {
     const existingUser = await this.repositoryUser.findOne({
       email: userData.email,
     });
 
     if (existingUser) {
-      throw new UnauthorizedException('Email already in use');
+      return { success: false, message: 'User with this email already exists' };
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -90,19 +104,32 @@ export class AuthService {
 
     const resultId = await this.repositoryUser.create(newUser);
 
+    const accessToken: string = this.jwtHelper.generateAccessToken(newUser);
+
+    const refreshToken: IRefreshToken = this.jwtHelper.generateRefreshToken(
+      newUser,
+      config().ttl,
+    );
+
+    this.repositoryRefreshToken.create(refreshToken);
+
     return {
-      message: 'User registered successfully',
-      userId: resultId,
+      success: true,
+      data: {
+        token: accessToken,
+        refreshToken: refreshToken.token,
+        userId: resultId,
+      },
     };
   }
 
-  async refreshToken(token: string) {
+  async refreshToken(token: string): Promise<IResponse<IAuthResponse>> {
     const existingToken = await this.repositoryRefreshToken.findOne({
       token,
     });
 
     if (!existingToken || existingToken.expiresAt < new Date()) {
-      throw new UnauthorizedException('Invalid refresh token');
+      return { success: false, message: 'Invalid refresh token' };
     }
 
     const user = await this.repositoryUser.findOne({
@@ -110,7 +137,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      return { success: false, message: 'User not found' };
     }
 
     const accessToken: string = this.jwtHelper.generateAccessToken(user);
@@ -125,8 +152,11 @@ export class AuthService {
     this.repositoryRefreshToken.create(newRefreshToken);
 
     return {
-      accessToken,
-      refreshToken: newRefreshToken.token,
+      success: true,
+      data: {
+        token: accessToken,
+        refreshToken: newRefreshToken.token,
+      },
     };
   }
 }
