@@ -3,8 +3,6 @@ export interface IAuthResponse {
   refreshToken: string;
 }
 
-export interface IAuthWithUserIdResponse {
-  token: string;
-  refreshToken: string;
+export interface IUserIdResponse {
   userId: string;
 }

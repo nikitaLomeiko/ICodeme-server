@@ -14,9 +14,7 @@ export class DBConnector implements IDBConnector<MongoClient> {
   async connect(): Promise<void> {
     try {
       await this.client.connect();
-      console.log(`Connected to MongoDB: ${this.dbName}`);
     } catch (error) {
-      console.error('Failed to connect to MongoDB:', error);
       throw error;
     }
   }

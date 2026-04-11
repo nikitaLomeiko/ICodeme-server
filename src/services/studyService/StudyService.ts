@@ -9,7 +9,7 @@ import { extractJsonFromMarkdown } from './helpers/ExtractJsonFromMarkdown';
 import { TypeGuards as CoreTypeGuards } from '@core/types/guards/TypeGuards';
 import { TypeGuards as ProfileTypeGuards } from '@models/profile/guards/TypeGuards';
 import { TypeGuards as QuizTypeGuards } from '@models/quiz/guards/TypeGuards';
-import { IResponse } from '@core/types/Response.type';
+import { IServiceResponse } from '@core/types/Response.type';
 
 @Injectable()
 export class StudyService {
@@ -22,13 +22,11 @@ export class StudyService {
 
   async generateStudyModules(
     language: string,
-  ): Promise<IResponse<INotation[]>> {
+  ): Promise<IServiceResponse<INotation[], string>> {
     const prompt = applyPromptVariables(
       this.fileStorage.readFile(this.path + '/generate_modules.txt'),
       { language: language },
     );
-
-    console.log(prompt);
 
     const answer = await this.chat.send(prompt);
     const json = extractJsonFromMarkdown(answer);
@@ -39,15 +37,15 @@ export class StudyService {
       if (!CoreTypeGuards.isNotationArray(parsed)) {
         return {
           success: false,
-          message: 'AI response is not a valid array of modules (INotation[])',
+          error: 'AI response is not a valid array of modules (INotation[])',
         };
       }
 
       return { success: true, data: parsed };
-    } catch (error) {
+    } catch (err) {
       return {
         success: false,
-        message: `Failed to parse modules: ${error.message}`,
+        error: `Failed to parse modules: ${err}`,
       };
     }
   }
@@ -55,7 +53,7 @@ export class StudyService {
   async generateStudyLevels(
     module: INotation,
     language: string,
-  ): Promise<IResponse<INotation[]>> {
+  ): Promise<IServiceResponse<INotation[], string>> {
     const prompt = applyPromptVariables(
       this.fileStorage.readFile(this.path + '/generate_levels.txt'),
       {
@@ -74,15 +72,15 @@ export class StudyService {
       if (!CoreTypeGuards.isNotationArray(parsed)) {
         return {
           success: false,
-          message: 'AI response is not a valid array of levels (INotation[])',
+          error: 'AI response is not a valid array of levels (INotation[])',
         };
       }
 
       return { success: true, data: parsed };
-    } catch (error) {
+    } catch (err) {
       return {
         success: false,
-        message: `Failed to parse levels: ${error.message}`,
+        error: `Failed to parse levels: ${err}`,
       };
     }
   }
@@ -91,7 +89,7 @@ export class StudyService {
     module: INotation,
     level: INotation,
     language: string,
-  ): Promise<IResponse<IStep[]>> {
+  ): Promise<IServiceResponse<IStep[], string>> {
     const prompt = applyPromptVariables(
       this.fileStorage.readFile(this.path + '/generate_steps.txt'),
       {
@@ -112,15 +110,15 @@ export class StudyService {
       if (!ProfileTypeGuards.isStepArray(parsed)) {
         return {
           success: false,
-          message: 'AI response is not a valid array of steps (INotation[])',
+          error: 'AI response is not a valid array of steps (INotation[])',
         };
       }
 
       return { success: true, data: parsed };
-    } catch (error) {
+    } catch (err) {
       return {
         success: false,
-        message: `Failed to parse steps: ${error.message}`,
+        error: `Failed to parse steps: ${err}`,
       };
     }
   }
@@ -130,7 +128,7 @@ export class StudyService {
     level: INotation,
     step: INotation,
     language: string,
-  ): Promise<IResponse<string>> {
+  ): Promise<IServiceResponse<string, string>> {
     const prompt = applyPromptVariables(
       this.fileStorage.readFile(this.path + '/generate_documentation.txt'),
       {
@@ -154,7 +152,7 @@ export class StudyService {
     level: INotation,
     step: INotation,
     language: string,
-  ): Promise<IResponse<string>> {
+  ): Promise<IServiceResponse<string, string>> {
     const prompt = applyPromptVariables(
       this.fileStorage.readFile(this.path + '/generate_practice.txt'),
       {
@@ -178,7 +176,7 @@ export class StudyService {
     level: INotation,
     step: INotation,
     language: string,
-  ): Promise<IResponse<IQuiz>> {
+  ): Promise<IServiceResponse<IQuiz, string>> {
     const prompt = applyPromptVariables(
       this.fileStorage.readFile(this.path + '/generate_quiz.txt'),
       {
@@ -201,20 +199,22 @@ export class StudyService {
       if (!QuizTypeGuards.isQuiz(parsed)) {
         return {
           success: false,
-          message: 'AI response is not a valid array of quiz (IQuiz)',
+          error: 'AI response is not a valid array of quiz (IQuiz)',
         };
       }
 
       return { success: true, data: parsed };
-    } catch (error) {
+    } catch (err) {
       return {
         success: false,
-        message: `Failed to parse quiz: ${error.message}`,
+        error: `Failed to parse quiz: ${err}`,
       };
     }
   }
 
-  async checkQuiz(quiz: IQuiz): Promise<IResponse<IQuiz | number>> {
+  async checkQuiz(
+    quiz: IQuiz,
+  ): Promise<IServiceResponse<IQuiz | number, string>> {
     const prompt = applyPromptVariables(
       this.fileStorage.readFile(this.path + '/check_quiz.txt'),
       {
@@ -237,15 +237,15 @@ export class StudyService {
       if (!QuizTypeGuards.isQuiz(parsed)) {
         return {
           success: false,
-          message: 'AI response is not a valid array of quiz (IQuiz)',
+          error: 'AI response is not a valid array of quiz (IQuiz)',
         };
       }
 
       return { success: true, data: parsed };
-    } catch (error) {
+    } catch (err) {
       return {
         success: false,
-        message: `Failed to parse quiz: ${error.message}`,
+        error: `Failed to parse quiz: ${err}`,
       };
     }
   }
@@ -254,7 +254,7 @@ export class StudyService {
     task: INotation,
     code: string,
     language: string,
-  ): Promise<IResponse<number | string>> {
+  ): Promise<IServiceResponse<number | string, string>> {
     const prompt = applyPromptVariables(
       this.fileStorage.readFile(this.path + '/check_code.txt'),
       {

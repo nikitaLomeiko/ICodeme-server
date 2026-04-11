@@ -8,7 +8,7 @@ import {
   IProfileData,
   ProfileKey,
 } from '@models/profile/Profile.model';
-import { IResponse } from '@core/types/Response.type';
+import { IServiceResponse } from '@core/types/Response.type';
 
 @Injectable()
 export class ProfileService {
@@ -21,11 +21,13 @@ export class ProfileService {
     );
   }
 
-  async getProfileById(id: string): Promise<IResponse<IProfile>> {
+  async getProfileById(
+    id: string,
+  ): Promise<IServiceResponse<IProfile, string>> {
     const profile = await this.repositoryProfile.findOne({ userId: id });
 
     if (!profile) {
-      return { success: false, message: 'User not found' };
+      return { success: false, error: 'User not found' };
     }
 
     return { success: true, data: profile };
@@ -35,7 +37,7 @@ export class ProfileService {
     user: { username: string; userId: string },
     data: IProfileData,
     programmingLanguage: string,
-  ): Promise<IResponse<IProfile>> {
+  ): Promise<IServiceResponse<IProfile, string>> {
     const profile = await this.repositoryProfile.findOne({
       userId: user.userId,
     });
@@ -43,7 +45,7 @@ export class ProfileService {
     if (profile) {
       return {
         success: false,
-        message: 'Profile has already been created',
+        error: 'Profile has already been created',
       };
     }
 
@@ -77,11 +79,11 @@ export class ProfileService {
   async ChangeProfileDataById(
     data: IProfileData,
     id: string,
-  ): Promise<IResponse<IProfile>> {
+  ): Promise<IServiceResponse<IProfile, string>> {
     const profile = await this.repositoryProfile.findOne({ userId: id });
 
     if (!profile) {
-      return { success: false, message: 'User not found' };
+      return { success: false, error: 'User not found' };
     }
 
     const result = await this.repositoryProfile.update(
@@ -90,7 +92,7 @@ export class ProfileService {
     );
 
     if (!result) {
-      return { success: false, message: 'User not found' };
+      return { success: false, error: 'User not found' };
     }
 
     return { success: true, data: { ...profile, data } };
@@ -99,11 +101,11 @@ export class ProfileService {
   async ChangeStudyPlanById(
     data: IModule[],
     id: string,
-  ): Promise<IResponse<IProfile>> {
+  ): Promise<IServiceResponse<IProfile, string>> {
     const profile = await this.repositoryProfile.findOne({ userId: id });
 
     if (!profile) {
-      return { success: false, message: 'User not found' };
+      return { success: false, error: 'User not found' };
     }
 
     const result = await this.repositoryProfile.update(
@@ -112,7 +114,7 @@ export class ProfileService {
     );
 
     if (!result) {
-      return { success: false, message: 'User not found' };
+      return { success: false, error: 'User not found' };
     }
 
     return { success: true, data: { ...profile, studyPlanJSON: data } };

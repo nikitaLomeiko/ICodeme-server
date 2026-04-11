@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
 import { GeneralModule } from '@modules/general';
+import { EmailModule } from '@modules/email';
 
 import { AuthController } from './controllers/auth.controller';
 import { AuthService } from '@services/authService';
@@ -20,6 +21,7 @@ dotenv.config();
       signOptions: { expiresIn: config().expiresIn },
     }),
     GeneralModule,
+    EmailModule,
   ],
   providers: [AuthService],
   controllers: [AuthController],

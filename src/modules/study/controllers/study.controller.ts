@@ -8,10 +8,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { IModule, IProfile, IStep } from '@models/profile/Profile.model';
+import { IModule, IStep } from '@models/profile/Profile.model';
 import { StudyService } from '@services/studyService/StudyService';
 import { ProfileService } from '@services/profileService';
-import { IResponse } from '@core/types/Response.type';
+import { IControllerResponse } from '@core/types/Response.type';
 import { INotation } from '@core/types/Notation.type';
 import { IQuiz } from '@models/quiz/Quiz.model';
 
@@ -24,7 +24,9 @@ export class StudyController {
   ) {}
 
   @Post('modules')
-  async generateStudyModule(@Request() req): Promise<IResponse<IModule[]>> {
+  async generateStudyModule(
+    @Request() req,
+  ): Promise<IControllerResponse<IModule[]>> {
     const result = await this.profileService.getProfileById(req.user.userId);
 
     const profile = result.data;
@@ -32,7 +34,7 @@ export class StudyController {
     console.log(result, profile);
 
     if (!result.success || !profile) {
-      throw new NotFoundException(result.message);
+      throw new NotFoundException(result.error);
     }
 
     if (profile.studyPlanJSON.length !== 0) {
@@ -47,7 +49,7 @@ export class StudyController {
 
     if (!resultGenerated.success || !modules) {
       throw new BadRequestException(
-        resultGenerated.message || 'Failed to generate modules',
+        resultGenerated.error || 'Failed to generate modules',
       );
     }
 
@@ -66,7 +68,7 @@ export class StudyController {
     );
 
     if (!resultChanged.success) {
-      throw new NotFoundException(resultChanged.message);
+      throw new NotFoundException(resultChanged.error);
     }
 
     return { success: true, data: newStudyPlan };
@@ -76,13 +78,13 @@ export class StudyController {
   async generateStudyLevels(
     @Request() req,
     @Body() data: { moduleIndex: number },
-  ): Promise<IResponse<INotation[]>> {
+  ): Promise<IControllerResponse<INotation[]>> {
     const result = await this.profileService.getProfileById(req.user.userId);
 
     const profile = result.data;
 
     if (!result.success || !profile) {
-      throw new NotFoundException(result.message);
+      throw new NotFoundException(result.error);
     }
 
     if (profile.studyPlanJSON.length === 0) {
@@ -104,7 +106,7 @@ export class StudyController {
 
     if (!resultGenerated.success || !levels) {
       throw new BadRequestException(
-        result.message || 'Failed to generate levels',
+        result.error || 'Failed to generate levels',
       );
     }
 
@@ -123,7 +125,7 @@ export class StudyController {
     );
 
     if (!resultChanged.success) {
-      throw new NotFoundException(resultChanged.message);
+      throw new NotFoundException(resultChanged.error);
     }
 
     return { success: true, data: levels };
@@ -133,13 +135,13 @@ export class StudyController {
   async generateStudySteps(
     @Request() req,
     @Body() data: { moduleIndex: number; levelIndex: number },
-  ): Promise<IResponse<IStep[]>> {
+  ): Promise<IControllerResponse<IStep[]>> {
     const result = await this.profileService.getProfileById(req.user.userId);
 
     const profile = result.data;
 
     if (!result.success || !profile) {
-      throw new NotFoundException(result.message);
+      throw new NotFoundException(result.error);
     }
 
     if (profile.studyPlanJSON.length === 0) {
@@ -169,7 +171,7 @@ export class StudyController {
 
     if (!resultGenerated.success || !steps) {
       throw new BadRequestException(
-        resultGenerated.message || 'Failed to generate steps',
+        resultGenerated.error || 'Failed to generate steps',
       );
     }
 
@@ -185,7 +187,7 @@ export class StudyController {
     );
 
     if (!resultChanged.success) {
-      throw new NotFoundException(resultChanged.message);
+      throw new NotFoundException(resultChanged.error);
     }
 
     return { success: true, data: steps };
@@ -196,13 +198,13 @@ export class StudyController {
     @Request() req,
     @Body()
     data: { moduleIndex: number; levelIndex: number; stepIndex: number },
-  ): Promise<IResponse<string>> {
+  ): Promise<IControllerResponse<string>> {
     const result = await this.profileService.getProfileById(req.user.userId);
 
     const profile = result.data;
 
     if (!result.success || !profile) {
-      throw new NotFoundException(result.message || 'Profile not found');
+      throw new NotFoundException(result.error || 'Profile not found');
     }
 
     if (profile.studyPlanJSON.length === 0) {
@@ -241,7 +243,7 @@ export class StudyController {
 
     if (!resultGenerated.success || !document) {
       throw new BadRequestException(
-        resultGenerated.message || 'Failed to generate document',
+        resultGenerated.error || 'Failed to generate document',
       );
     }
 
@@ -255,7 +257,7 @@ export class StudyController {
     );
 
     if (!resultChanged.success) {
-      throw new NotFoundException(resultChanged.message);
+      throw new NotFoundException(resultChanged.error);
     }
 
     return { success: true, data: document };
@@ -266,13 +268,13 @@ export class StudyController {
     @Request() req,
     @Body()
     data: { moduleIndex: number; levelIndex: number; stepIndex: number },
-  ): Promise<IResponse<string>> {
+  ): Promise<IControllerResponse<string>> {
     const result = await this.profileService.getProfileById(req.user.userId);
 
     const profile = result.data;
 
     if (!result.success || !profile) {
-      throw new NotFoundException(result.message || 'Profile not found');
+      throw new NotFoundException(result.error || 'Profile not found');
     }
 
     if (profile.studyPlanJSON.length === 0) {
@@ -311,7 +313,7 @@ export class StudyController {
 
     if (!resultGenerated.success || !practice) {
       throw new BadRequestException(
-        resultGenerated.message || 'Failed to generate practice',
+        resultGenerated.error || 'Failed to generate practice',
       );
     }
 
@@ -325,7 +327,7 @@ export class StudyController {
     );
 
     if (!resultChanged.success) {
-      throw new NotFoundException(resultChanged.message);
+      throw new NotFoundException(resultChanged.error);
     }
 
     return {
@@ -339,13 +341,13 @@ export class StudyController {
     @Request() req,
     @Body()
     data: { moduleIndex: number; levelIndex: number; stepIndex: number },
-  ): Promise<IResponse<IQuiz>> {
+  ): Promise<IControllerResponse<IQuiz>> {
     const result = await this.profileService.getProfileById(req.user.userId);
 
     const profile = result.data;
 
     if (!result.success || !profile) {
-      throw new NotFoundException(result.message || 'Profile not found');
+      throw new NotFoundException(result.error || 'Profile not found');
     }
 
     if (profile.studyPlanJSON.length === 0) {
@@ -384,7 +386,7 @@ export class StudyController {
 
     if (!resultGenerated.success || !quiz) {
       throw new BadRequestException(
-        resultGenerated.message || 'Failed to generate quiz',
+        resultGenerated.error || 'Failed to generate quiz',
       );
     }
 
@@ -398,7 +400,7 @@ export class StudyController {
     );
 
     if (!resultChanged.success) {
-      throw new NotFoundException(resultChanged.message);
+      throw new NotFoundException(resultChanged.error);
     }
 
     return { success: true, data: quiz };

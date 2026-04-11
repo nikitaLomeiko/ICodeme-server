@@ -15,7 +15,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { IProfile, IProfileData } from '@models/profile/Profile.model';
 import { ProfileService } from '@services/profileService';
-import { IResponse } from '@core/types/Response.type';
+import { IControllerResponse } from '@core/types/Response.type';
 
 @Controller('profiles')
 @UseGuards(AuthGuard('jwt'))
@@ -23,11 +23,11 @@ export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
   @Get('me')
-  async getMyProfile(@Request() req): Promise<IResponse<IProfile>> {
+  async getMyProfile(@Request() req): Promise<IControllerResponse<IProfile>> {
     const result = await this.profileService.getProfileById(req.user.userId);
 
     if (!result.success) {
-      throw new NotFoundException(result.message);
+      throw new NotFoundException(result.error);
     }
 
     return result;
@@ -37,7 +37,7 @@ export class ProfileController {
   async createNewProfile(
     @Request() req,
     @Body() data: { profile: IProfileData; programmingLanguage: string },
-  ): Promise<IResponse<IProfile>> {
+  ): Promise<IControllerResponse<IProfile>> {
     const result = await this.profileService.CreateNewProfile(
       req.user,
       data.profile,
@@ -45,7 +45,7 @@ export class ProfileController {
     );
 
     if (!result.success) {
-      throw new BadRequestException(result.message);
+      throw new BadRequestException(result.error);
     }
 
     return result;
@@ -55,21 +55,21 @@ export class ProfileController {
   async updateMyProfile(
     @Request() req,
     @Body() data: { profileData: IProfileData },
-  ): Promise<IResponse<IProfile>> {
+  ): Promise<IControllerResponse<IProfile>> {
     const result = await this.profileService.ChangeProfileDataById(
       data.profileData,
       req.user.userId,
     );
 
     if (!result.success) {
-      throw new NotFoundException(result.message);
+      throw new NotFoundException(result.error);
     }
 
     return result;
   }
 
   @Delete('me')
-  async deleteMyProfile(@Request() req): Promise<IResponse> {
+  async deleteMyProfile(@Request() req): Promise<IControllerResponse> {
     const result = await this.profileService.RemoveProfileById(req.user.userId);
 
     if (!result.success) {
