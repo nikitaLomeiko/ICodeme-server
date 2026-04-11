@@ -1,19 +1,9 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Request,
-  UnauthorizedException,
-  UseGuards,
-} from '@nestjs/common';
-import { AuthService } from '@services/authService';
-import { IUser } from '@models/user/User.model';
+import { Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { AuthService } from '@services/authService';
+import { IUser } from '@models/user';
 import { IControllerResponse } from '@core/types/Response.type';
-import {
-  IAuthResponse,
-  IUserIdResponse,
-} from '@models/auth/AuthResponse.model';
+import { IAuthResponse, IUserIdResponse } from '@models/auth';
 import { AuthError } from '@models/auth';
 
 @Controller('auth')
@@ -26,24 +16,28 @@ export class AuthController {
 
     const result = await this.authService.login(email, password);
 
-    switch (result.error) {
-      case AuthError.INVALID_CREDENTIALS:
+    if (result.error === AuthError.INVALID_CREDENTIALS) {
+      return {
+        success: false,
+        message: 'Invalid username or password',
+      };
+    }
+
+    if (result.error === AuthError.MAIL_NOT_CONFIRMED) {
+      const resultConfirmCode =
+        await this.authService.generateAndSendConfirmCode(email);
+
+      if (!resultConfirmCode.success) {
         return {
           success: false,
-          message: 'Invalid username or password',
+          message: 'an error occurred while generating the code',
         };
-      case AuthError.MAIL_NOT_CONFIRMED:
-        return {
-          success: false,
-          message:
-            'Mail not confirmed, the code has been sent to your email, please confirm',
-        };
-      case AuthError.CONFIRMATION_CODE_NOT_CREATED:
-        return {
-          success: false,
-          message:
-            'The email is not verified. Failed to create a verification code',
-        };
+      }
+
+      return {
+        success: true,
+        message: `The confirmation code has been sent to the mail ${email}`,
+      };
     }
 
     return result;
@@ -60,29 +54,34 @@ export class AuthController {
 
     const result = await this.authService.register(userData, password);
 
-    switch (result.error) {
-      case AuthError.USER_EXISTS:
-        return {
-          success: false,
-          message: 'A user with such an email already exists',
-        };
-      case AuthError.USER_NOT_CREATED:
-        return {
-          success: false,
-          message: 'Failed to create a user',
-        };
-      case AuthError.CONFIRMATION_CODE_NOT_CREATED:
-        return {
-          success: false,
-          message:
-            'The email is not verified. Failed to create a verification code',
-        };
+    if (result.error === AuthError.USER_EXISTS) {
+      return {
+        success: false,
+        message: 'A user with such an email already exists',
+      };
+    }
+
+    if (result.error === AuthError.USER_NOT_CREATED) {
+      return {
+        success: false,
+        message: 'Failed to create a user',
+      };
+    }
+
+    const resultConfirmCode = await this.authService.generateAndSendConfirmCode(
+      userData.email,
+    );
+
+    if (!resultConfirmCode.success) {
+      return {
+        success: false,
+        message: 'an error occurred while generating the code',
+      };
     }
 
     return {
-      ...result,
-      message:
-        'A code was sent to your email, and you need to confirm your email',
+      success: true,
+      message: `The confirmation code has been sent to the mail ${userData.email}`,
     };
   }
 
@@ -92,36 +91,32 @@ export class AuthController {
 
     const result = await this.authService.confirmCode(code, userId);
 
-    switch (result.error) {
-      case AuthError.MAIL_CONFIRMED:
-        return {
-          success: false,
-          message: 'The mail has already been confirmed',
-        };
-      case AuthError.USER_NOT_FOUND:
-        return {
-          success: false,
-          message: 'User not found',
-        };
-      case AuthError.CONFIRMATION_CODE_NOT_CREATED:
-        return {
-          success: false,
-          message:
-            'The email is not verified. Failed to create a verification code',
-        };
-      case AuthError.CODE_INCORRECT:
-        return {
-          success: false,
-          message: 'Code incorrect',
-        };
-      case AuthError.USER_NOT_UPDATED:
-        return {
-          success: false,
-          message: 'User not updated',
-        };
+    if (result.error === AuthError.MAIL_CONFIRMED) {
+      return {
+        success: false,
+        message: 'The mail has already been confirmed',
+      };
     }
 
-    return result;
+    if (result.error === AuthError.CODE_INCORRECT) {
+      return {
+        success: false,
+        message: 'Code incorrect',
+      };
+    }
+
+    if (!result.success) {
+      return {
+        success: false,
+        message:
+          'An error occurred while trying to verify the confirmation code',
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Mail has been successfully confirmed',
+    };
   }
 
   @Post('refresh')
@@ -130,17 +125,11 @@ export class AuthController {
 
     const result = await this.authService.refreshToken(refreshToken);
 
-    switch (result.error) {
-      case AuthError.INVALID_TOKEN:
-        return {
-          success: false,
-          message: 'Invalid token',
-        };
-      case AuthError.USER_NOT_FOUND:
-        return {
-          success: false,
-          message: 'User not found',
-        };
+    if (!result.success) {
+      return {
+        success: false,
+        message: 'Failed to retrieve a refresh token',
+      };
     }
 
     return result;

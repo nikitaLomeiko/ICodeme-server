@@ -1,25 +1,32 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Db } from 'mongodb';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import config from '@core/config/jwt/jwt.config';
+
+import { BaseMongoRepository } from '@core/db';
 
 import { JwtHelper } from './helpers/Jwt.helper';
-import { IUser, UserKey } from '@models/user/User.model';
-import { BaseMongoRepository } from '@core/db';
 import { generateId } from '@core/helpers/GenerateId';
-import { JwtService } from '@nestjs/jwt';
-import { IServiceResponse } from '@core/types/Response.type';
-import { IConfirmationCode } from '@models/confirmation-code';
-import { ConfirmationCodeKey } from '@models/confirmation-code';
 import { generateConfirmCode } from './helpers/Generate.confirm.code';
+import { IServiceResponse } from '@core/types/Response.type';
+
+import { IUser, UserKey } from '@models/user';
+import {
+  IConfirmationCode,
+  ConfirmationCodeKey,
+} from '@models/confirmation-code';
 import {
   AuthError,
   IAuthResponse,
   IRefreshToken,
   IUserIdResponse,
   RefreshTokenKey,
-} from '@models/auth/';
+} from '@models/auth';
+
 import { EmailService } from '@services/emailService';
+
+import config from '@core/config/jwt/jwt.config';
+import e from 'express';
 
 @Injectable()
 export class AuthService {
@@ -70,27 +77,6 @@ export class AuthService {
     }
 
     if (!existingUser.isEmailConfirmed) {
-      const now = new Date();
-      const hashedConfirmCode = await bcrypt.hash(generateConfirmCode(), 10);
-
-      const newCode: IConfirmationCode = {
-        _id: generateId(existingUser._id),
-        userId: existingUser._id,
-        codeHash: hashedConfirmCode,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const resultCreatedConfirmCode =
-        await this.repositoryConfirmationCode.create(newCode);
-
-      if (!resultCreatedConfirmCode) {
-        return {
-          success: false,
-          error: AuthError.CONFIRMATION_CODE_NOT_CREATED,
-        };
-      }
-
       return {
         success: false,
         error: AuthError.MAIL_NOT_CONFIRMED,
@@ -148,34 +134,6 @@ export class AuthService {
         error: AuthError.USER_NOT_CREATED,
       };
     }
-
-    const code = generateConfirmCode();
-
-    const hashedConfirmCode = await bcrypt.hash(code, 10);
-
-    const newCode: IConfirmationCode = {
-      _id: generateId(resultCreatedUser),
-      userId: newUser._id,
-      codeHash: hashedConfirmCode,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    const resultCreatedConfirmCode =
-      await this.repositoryConfirmationCode.create(newCode);
-
-    if (!resultCreatedConfirmCode) {
-      return {
-        success: false,
-        error: AuthError.CONFIRMATION_CODE_NOT_CREATED,
-      };
-    }
-
-    await this.emailService.sendEmail({
-      subject: `Код подтверждения`,
-      to: userData.email,
-      text: `${code}`,
-    });
 
     return {
       success: true,
@@ -280,6 +238,52 @@ export class AuthService {
         token: accessToken,
         refreshToken: newRefreshToken.token,
       },
+    };
+  }
+
+  async generateAndSendConfirmCode(
+    email: string,
+  ): Promise<IServiceResponse<null, AuthError>> {
+    const user = await this.repositoryUser.findOne({ email });
+
+    if (!user) {
+      return {
+        success: false,
+        error: AuthError.INVALID_CREDENTIALS,
+      };
+    }
+
+    const now = new Date();
+    const code = generateConfirmCode();
+
+    const hashedConfirmCode = await bcrypt.hash(code, 10);
+
+    const newCode: IConfirmationCode = {
+      _id: generateId(email),
+      userId: user._id,
+      codeHash: hashedConfirmCode,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const resultCreatedConfirmCode =
+      await this.repositoryConfirmationCode.create(newCode);
+
+    if (!resultCreatedConfirmCode) {
+      return {
+        success: false,
+        error: AuthError.CONFIRMATION_CODE_NOT_CREATED,
+      };
+    }
+
+    await this.emailService.sendEmail({
+      subject: `Код подтверждения`,
+      to: email,
+      text: `${code}`,
+    });
+
+    return {
+      success: true,
     };
   }
 }
