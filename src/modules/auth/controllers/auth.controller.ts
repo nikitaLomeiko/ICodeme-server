@@ -9,7 +9,7 @@ import {
   UseGuards,
   BadRequestException,
   ConflictException,
-  Redirect,
+  Res,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthError, AuthService } from '@services/authService';
@@ -17,6 +17,8 @@ import { IUser } from '@models/user';
 import { IControllerResponse } from '@core/types/Response.type';
 import { IAuthResponse, IUserIdResponse } from '@models/auth';
 import config from '@core/config/google/google.config';
+import githubConfig from '@core/config/github/github.config';
+import type * as express from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -61,8 +63,7 @@ export class AuthController {
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  @Redirect()
-  async googleAuthRedirect(@Request() req) {
+  async googleAuthRedirect(@Request() req, @Res() res: express.Response) {
     const googleUser = req.user;
 
     const result = await this.authService.validateOrCreateGoogleUser(
@@ -74,13 +75,43 @@ export class AuthController {
 
     if (!result.success) {
       const frontendUrl = config().frontendURL;
-      return { url: `${frontendUrl}/auth/google/error?error=user_exists` };
+      return res.redirect(`${frontendUrl}/auth/google/error?error=user_exists`);
     }
 
     const frontendUrl = config().frontendURL;
-    return {
-      url: `${frontendUrl}/auth/google/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
-    };
+    return res.redirect(
+      `${frontendUrl}/auth/google/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
+    );
+  }
+
+  @Get('github')
+  @UseGuards(AuthGuard('github'))
+  async githubAuth() {
+    // Redirects to GitHub automatically by Passport
+  }
+
+  @Get('github/callback')
+  @UseGuards(AuthGuard('github'))
+  async githubAuthRedirect(@Request() req, @Res() res: express.Response) {
+    const githubUser = req.user;
+
+    const result = await this.authService.validateOrCreateGitHubUser(
+      githubUser.githubId,
+      githubUser.email,
+      githubUser.name,
+      githubUser.picture,
+      githubUser.username,
+    );
+
+    const frontendUrl = githubConfig().frontendURL;
+
+    if (!result.success) {
+      return res.redirect(`${frontendUrl}/auth/github/error?error=user_exists`);
+    }
+
+    return res.redirect(
+      `${frontendUrl}/auth/github/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
+    );
   }
 
   @Post('register')

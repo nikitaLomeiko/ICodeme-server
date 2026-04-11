@@ -5,9 +5,11 @@ export interface IUser extends BaseEntity {
   email: string;
   password_hash?: string;
   isEmailConfirmed: boolean;
-  provider?: 'local' | 'google';
+  provider?: 'local' | 'google' | 'github';
   googleId?: string;
+  githubId?: string;
   picture?: string;
+  username?: string;
 }
 
 export const UserKey = 'users';
