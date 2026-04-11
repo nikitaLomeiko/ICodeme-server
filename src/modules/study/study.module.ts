@@ -7,7 +7,7 @@ import { StudyService } from '@services/studyService/StudyService';
 import { ProfileService } from '@services/profileService';
 
 import { StudyController } from './controllers/study.controller';
-import { AIProvider, ChatSession } from '@core/ai';
+import { AIProvider } from '@core/ai';
 import { FileStorageProvider } from '@core/storage';
 
 dotenv.config();

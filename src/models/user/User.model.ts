@@ -3,8 +3,11 @@ import { BaseEntity } from '@core/types/BaseEntity.abstract';
 export interface IUser extends BaseEntity {
   name: string;
   email: string;
-  password_hash: string;
+  password_hash?: string;
   isEmailConfirmed: boolean;
+  provider?: 'local' | 'google';
+  googleId?: string;
+  picture?: string;
 }
 
 export const UserKey = 'users';

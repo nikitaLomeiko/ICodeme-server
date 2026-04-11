@@ -9,12 +9,14 @@ import {
   UseGuards,
   BadRequestException,
   ConflictException,
+  Redirect,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthError, AuthService } from '@services/authService';
 import { IUser } from '@models/user';
 import { IControllerResponse } from '@core/types/Response.type';
 import { IAuthResponse, IUserIdResponse } from '@models/auth';
+import config from '@core/config/google/google.config';
 
 @Controller('auth')
 export class AuthController {
@@ -48,6 +50,36 @@ export class AuthController {
     return {
       ...result,
       message: 'Authorization completed successfully',
+    };
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth() {
+    // Redirects to Google automatically by Passport
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @Redirect()
+  async googleAuthRedirect(@Request() req) {
+    const googleUser = req.user;
+
+    const result = await this.authService.validateOrCreateGoogleUser(
+      googleUser.picture?.split('/')[4] || googleUser.email,
+      googleUser.email,
+      `${googleUser.name?.givenName || ''} ${googleUser.name?.familyName || ''}`.trim(),
+      googleUser.picture,
+    );
+
+    if (!result.success) {
+      const frontendUrl = config().frontendURL;
+      return { url: `${frontendUrl}/auth/google/error?error=user_exists` };
+    }
+
+    const frontendUrl = config().frontendURL;
+    return {
+      url: `${frontendUrl}/auth/google/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
     };
   }
 
@@ -122,7 +154,10 @@ export class AuthController {
       throw new UnauthorizedException('Failed to retrieve a refresh token');
     }
 
-    return result;
+    return {
+      ...result,
+      message: 'Token refreshed successfully',
+    };
   }
 
   @Get('verify-token')

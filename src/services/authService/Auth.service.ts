@@ -68,7 +68,7 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(
       password,
-      existingUser.password_hash,
+      existingUser.password_hash || '', // TASK
     );
 
     if (!isPasswordValid) {
@@ -283,6 +283,63 @@ export class AuthService {
 
     return {
       success: true,
+    };
+  }
+
+  async validateOrCreateGoogleUser(
+    googleId: string,
+    email: string,
+    name: string,
+    picture?: string,
+  ): Promise<IServiceResponse<IAuthResponse, AuthError>> {
+    let user = await this.repositoryUser.findOne({ email });
+
+    if (!user) {
+      const now = new Date();
+      const newUser: IUser = {
+        _id: generateId(email),
+        email,
+        name,
+        provider: 'google',
+        googleId,
+        picture,
+        isEmailConfirmed: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const createdUserId = await this.repositoryUser.create(newUser);
+
+      if (!createdUserId) {
+        return {
+          success: false,
+          error: AuthError.USER_NOT_CREATED,
+        };
+      }
+
+      user = { ...newUser, _id: createdUserId };
+    } else if (user.provider !== 'google') {
+      return {
+        success: false,
+        error: AuthError.USER_EXISTS,
+      };
+    }
+
+    const accessToken: string = this.jwtHelper.generateAccessToken(user);
+
+    const refreshToken: IRefreshToken = this.jwtHelper.generateRefreshToken(
+      user,
+      config().ttl,
+    );
+
+    await this.repositoryRefreshToken.create(refreshToken);
+
+    return {
+      success: true,
+      data: {
+        token: accessToken,
+        refreshToken: refreshToken.token,
+      },
     };
   }
 }

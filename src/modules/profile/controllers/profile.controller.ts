@@ -73,7 +73,7 @@ export class ProfileController {
     const result = await this.profileService.RemoveProfileById(req.user.userId);
 
     if (!result.success) {
-      throw new NotFoundException(result.message);
+      throw new NotFoundException(result.error);
     }
 
     return result;
