@@ -9,6 +9,7 @@ import {
   ProfileKey,
 } from '@models/profile/Profile.model';
 import { IServiceResponse } from '@core/types/Response.type';
+import { ProfileError } from './types/Error.types';
 
 @Injectable()
 export class ProfileService {
@@ -23,11 +24,11 @@ export class ProfileService {
 
   async getProfileById(
     id: string,
-  ): Promise<IServiceResponse<IProfile, string>> {
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ userId: id });
 
     if (!profile) {
-      return { success: false, error: 'User not found' };
+      return { success: false, error: ProfileError.PROFILE_NOT_FOUND };
     }
 
     return { success: true, data: profile };
@@ -37,7 +38,7 @@ export class ProfileService {
     user: { username: string; userId: string },
     data: IProfileData,
     programmingLanguage: string,
-  ): Promise<IServiceResponse<IProfile, string>> {
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({
       userId: user.userId,
     });
@@ -45,7 +46,7 @@ export class ProfileService {
     if (profile) {
       return {
         success: false,
-        error: 'Profile has already been created',
+        error: ProfileError.PROFILE_ALREADY_CREATED,
       };
     }
 
@@ -79,11 +80,11 @@ export class ProfileService {
   async ChangeProfileDataById(
     data: IProfileData,
     id: string,
-  ): Promise<IServiceResponse<IProfile, string>> {
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ userId: id });
 
     if (!profile) {
-      return { success: false, error: 'User not found' };
+      return { success: false, error: ProfileError.USER_NOT_FOUND };
     }
 
     const result = await this.repositoryProfile.update(
@@ -92,7 +93,7 @@ export class ProfileService {
     );
 
     if (!result) {
-      return { success: false, error: 'User not found' };
+      return { success: false, error: ProfileError.USER_NOT_FOUND };
     }
 
     return { success: true, data: { ...profile, data } };
@@ -101,11 +102,11 @@ export class ProfileService {
   async ChangeStudyPlanById(
     data: IModule[],
     id: string,
-  ): Promise<IServiceResponse<IProfile, string>> {
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ userId: id });
 
     if (!profile) {
-      return { success: false, error: 'User not found' };
+      return { success: false, error: ProfileError.USER_NOT_FOUND };
     }
 
     const result = await this.repositoryProfile.update(
@@ -114,17 +115,19 @@ export class ProfileService {
     );
 
     if (!result) {
-      return { success: false, error: 'User not found' };
+      return { success: false, error: ProfileError.USER_NOT_FOUND };
     }
 
     return { success: true, data: { ...profile, studyPlanJSON: data } };
   }
 
-  async RemoveProfileById(id: string) {
+  async RemoveProfileById(
+    id: string,
+  ): Promise<IServiceResponse<null, ProfileError>> {
     const result = await this.repositoryProfile.delete({ userId: id });
 
     if (!result) {
-      return { success: false, message: 'User not found' };
+      return { success: false, error: ProfileError.USER_NOT_FOUND };
     }
 
     return { success: true };

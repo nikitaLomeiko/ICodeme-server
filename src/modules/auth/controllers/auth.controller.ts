@@ -11,11 +11,10 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { AuthService } from '@services/authService';
+import { AuthError, AuthService } from '@services/authService';
 import { IUser } from '@models/user';
 import { IControllerResponse } from '@core/types/Response.type';
 import { IAuthResponse, IUserIdResponse } from '@models/auth';
-import { AuthError } from '@models/auth';
 
 @Controller('auth')
 export class AuthController {

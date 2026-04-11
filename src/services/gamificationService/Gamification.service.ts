@@ -3,7 +3,7 @@ import { Db } from 'mongodb';
 import { BaseMongoRepository } from '@core/db';
 import { IModule, IPosition, IProfile, ProfileKey } from '@models/profile';
 import { IServiceResponse } from '@core/types/Response.type';
-import { ProfileError } from '@models/profile/types';
+import { GamificationError } from './types/Error.types';
 
 @Injectable()
 export class GamificationService {
@@ -19,13 +19,13 @@ export class GamificationService {
   async addExperienceByUserId(
     id: string,
     experience: number,
-  ): Promise<IServiceResponse<IProfile, ProfileError>> {
+  ): Promise<IServiceResponse<IProfile, GamificationError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
       return {
         success: false,
-        error: ProfileError.PROFILE_NOT_FOUND,
+        error: GamificationError.PROFILE_NOT_FOUND,
       };
     }
 
@@ -49,13 +49,13 @@ export class GamificationService {
 
   async nextModuleByUserId(
     id: string,
-  ): Promise<IServiceResponse<IProfile, ProfileError>> {
+  ): Promise<IServiceResponse<IProfile, GamificationError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
       return {
         success: false,
-        error: ProfileError.PROFILE_NOT_FOUND,
+        error: GamificationError.PROFILE_NOT_FOUND,
       };
     }
 
@@ -75,7 +75,7 @@ export class GamificationService {
 
   async nextLevelByUserId(
     id: string,
-  ): Promise<IServiceResponse<IProfile, ProfileError>> {
+  ): Promise<IServiceResponse<IProfile, GamificationError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (
@@ -84,7 +84,7 @@ export class GamificationService {
     ) {
       return {
         success: false,
-        error: ProfileError.PROFILE_NOT_FOUND,
+        error: GamificationError.PROFILE_NOT_FOUND,
       };
     }
 
@@ -106,13 +106,13 @@ export class GamificationService {
 
   async nextStepByUserId(
     id: string,
-  ): Promise<IServiceResponse<IProfile, ProfileError>> {
+  ): Promise<IServiceResponse<IProfile, GamificationError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
       return {
         success: false,
-        error: ProfileError.PROFILE_NOT_FOUND,
+        error: GamificationError.PROFILE_NOT_FOUND,
       };
     }
 
@@ -135,13 +135,13 @@ export class GamificationService {
   async setLevelPlanByUserId(
     id: string,
     plan: IPosition[],
-  ): Promise<IServiceResponse<IProfile, ProfileError>> {
+  ): Promise<IServiceResponse<IProfile, GamificationError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
       return {
         success: false,
-        error: ProfileError.PROFILE_NOT_FOUND,
+        error: GamificationError.PROFILE_NOT_FOUND,
       };
     }
 
@@ -158,13 +158,13 @@ export class GamificationService {
   async setStudyPlanByUserId(
     id: string,
     plan: IModule[],
-  ): Promise<IServiceResponse<IProfile, ProfileError>> {
+  ): Promise<IServiceResponse<IProfile, GamificationError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
       return {
         success: false,
-        error: ProfileError.PROFILE_NOT_FOUND,
+        error: GamificationError.PROFILE_NOT_FOUND,
       };
     }
 

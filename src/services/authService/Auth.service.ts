@@ -16,7 +16,6 @@ import {
   ConfirmationCodeKey,
 } from '@models/confirmation-code';
 import {
-  AuthError,
   IAuthResponse,
   IRefreshToken,
   IUserIdResponse,
@@ -26,7 +25,7 @@ import {
 import { EmailService } from '@services/emailService';
 
 import config from '@core/config/jwt/jwt.config';
-import e from 'express';
+import { AuthError } from './types';
 
 @Injectable()
 export class AuthService {

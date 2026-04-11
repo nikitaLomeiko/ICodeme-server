@@ -1,3 +1,5 @@
 export enum ProfileError {
   PROFILE_NOT_FOUND,
+  PROFILE_ALREADY_CREATED,
+  USER_NOT_FOUND,
 }
