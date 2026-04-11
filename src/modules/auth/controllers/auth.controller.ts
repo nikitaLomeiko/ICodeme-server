@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  UnauthorizedException,
+  InternalServerErrorException,
+  Get,
+  Post,
+  Request,
+  UseGuards,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from '@services/authService';
 import { IUser } from '@models/user';
@@ -17,10 +28,7 @@ export class AuthController {
     const result = await this.authService.login(email, password);
 
     if (result.error === AuthError.INVALID_CREDENTIALS) {
-      return {
-        success: false,
-        message: 'Invalid username or password',
-      };
+      throw new UnauthorizedException('Invalid username or password');
     }
 
     if (result.error === AuthError.MAIL_NOT_CONFIRMED) {
@@ -28,19 +36,20 @@ export class AuthController {
         await this.authService.generateAndSendConfirmCode(email);
 
       if (!resultConfirmCode.success) {
-        return {
-          success: false,
-          message: 'an error occurred while generating the code',
-        };
+        throw new InternalServerErrorException(
+          'An error occurred while generating the code',
+        );
       }
 
-      return {
-        success: true,
-        message: `The confirmation code has been sent to the mail ${email}`,
-      };
+      throw new ForbiddenException(
+        'Please confirm your email before logging in',
+      );
     }
 
-    return result;
+    return {
+      ...result,
+      message: 'Authorization completed successfully',
+    };
   }
 
   @Post('register')
@@ -55,17 +64,11 @@ export class AuthController {
     const result = await this.authService.register(userData, password);
 
     if (result.error === AuthError.USER_EXISTS) {
-      return {
-        success: false,
-        message: 'A user with such an email already exists',
-      };
+      throw new ConflictException('A user with such an email already exists');
     }
 
     if (result.error === AuthError.USER_NOT_CREATED) {
-      return {
-        success: false,
-        message: 'Failed to create a user',
-      };
+      throw new InternalServerErrorException('Failed to create user');
     }
 
     const resultConfirmCode = await this.authService.generateAndSendConfirmCode(
@@ -73,10 +76,9 @@ export class AuthController {
     );
 
     if (!resultConfirmCode.success) {
-      return {
-        success: false,
-        message: 'an error occurred while generating the code',
-      };
+      throw new InternalServerErrorException(
+        'An error occurred while generating the code',
+      );
     }
 
     return {
@@ -92,25 +94,17 @@ export class AuthController {
     const result = await this.authService.confirmCode(code, userId);
 
     if (result.error === AuthError.MAIL_CONFIRMED) {
-      return {
-        success: false,
-        message: 'The mail has already been confirmed',
-      };
+      throw new ConflictException('The mail has already been confirmed');
     }
 
     if (result.error === AuthError.CODE_INCORRECT) {
-      return {
-        success: false,
-        message: 'Code incorrect',
-      };
+      throw new BadRequestException('Code incorrect');
     }
 
     if (!result.success) {
-      return {
-        success: false,
-        message:
-          'An error occurred while trying to verify the confirmation code',
-      };
+      throw new InternalServerErrorException(
+        'An error occurred while trying to verify the confirmation code',
+      );
     }
 
     return {
@@ -126,10 +120,7 @@ export class AuthController {
     const result = await this.authService.refreshToken(refreshToken);
 
     if (!result.success) {
-      return {
-        success: false,
-        message: 'Failed to retrieve a refresh token',
-      };
+      throw new UnauthorizedException('Failed to retrieve a refresh token');
     }
 
     return result;

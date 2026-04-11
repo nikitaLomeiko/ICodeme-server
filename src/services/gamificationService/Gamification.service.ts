@@ -1,12 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Db } from 'mongodb';
 import { BaseMongoRepository } from '@core/db';
-import {
-  IModule,
-  IPosition,
-  IProfile,
-  ProfileKey,
-} from '@models/profile/Profile.model';
+import { IModule, IPosition, IProfile, ProfileKey } from '@models/profile';
+import { IServiceResponse } from '@core/types/Response.type';
+import { ProfileError } from '@models/profile/types';
 
 @Injectable()
 export class GamificationService {
@@ -19,11 +16,17 @@ export class GamificationService {
     );
   }
 
-  async addExperienceByUserId(id: string, experience: number) {
+  async addExperienceByUserId(
+    id: string,
+    experience: number,
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
-      throw new NotFoundException('Profile not found');
+      return {
+        success: false,
+        error: ProfileError.PROFILE_NOT_FOUND,
+      };
     }
 
     profile.stats.experience += experience;
@@ -40,16 +43,20 @@ export class GamificationService {
 
     return {
       success: true,
-      profile,
-      message: 'Experience added successfully',
+      data: profile,
     };
   }
 
-  async nextModuleByUserId(id: string) {
+  async nextModuleByUserId(
+    id: string,
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
-      throw new NotFoundException('Profile not found');
+      return {
+        success: false,
+        error: ProfileError.PROFILE_NOT_FOUND,
+      };
     }
 
     if (profile.study.module + 1 < profile.studyPlanJSON.length) {
@@ -62,19 +69,23 @@ export class GamificationService {
 
     return {
       success: true,
-      profile,
-      message: 'Module added successfully',
+      data: profile,
     };
   }
 
-  async nextLevelByUserId(id: string) {
+  async nextLevelByUserId(
+    id: string,
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (
       !profile ||
       profile.studyPlanJSON[profile.study.module - 1].levels === undefined
     ) {
-      throw new NotFoundException('Profile not found');
+      return {
+        success: false,
+        error: ProfileError.PROFILE_NOT_FOUND,
+      };
     }
 
     if (
@@ -89,16 +100,20 @@ export class GamificationService {
 
     return {
       success: true,
-      profile,
-      message: 'Level added successfully',
+      data: profile,
     };
   }
 
-  async nextStepByUserId(id: string) {
+  async nextStepByUserId(
+    id: string,
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
-      throw new NotFoundException('Profile not found');
+      return {
+        success: false,
+        error: ProfileError.PROFILE_NOT_FOUND,
+      };
     }
 
     const currentModule = profile.studyPlanJSON[profile.study.module - 1];
@@ -113,16 +128,21 @@ export class GamificationService {
 
     return {
       success: true,
-      profile,
-      message: 'Step added successfully',
+      data: profile,
     };
   }
 
-  async setLevelPlanByUserId(id: string, plan: IPosition[]) {
+  async setLevelPlanByUserId(
+    id: string,
+    plan: IPosition[],
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
-      throw new NotFoundException('Profile not found');
+      return {
+        success: false,
+        error: ProfileError.PROFILE_NOT_FOUND,
+      };
     }
 
     profile.levelPlanJSON = plan;
@@ -131,16 +151,21 @@ export class GamificationService {
 
     return {
       success: true,
-      profile,
-      message: 'Set level plan successfully',
+      data: profile,
     };
   }
 
-  async setStudyPlanByUserId(id: string, plan: IModule[]) {
+  async setStudyPlanByUserId(
+    id: string,
+    plan: IModule[],
+  ): Promise<IServiceResponse<IProfile, ProfileError>> {
     const profile = await this.repositoryProfile.findOne({ _id: id });
 
     if (!profile) {
-      throw new NotFoundException('Profile not found');
+      return {
+        success: false,
+        error: ProfileError.PROFILE_NOT_FOUND,
+      };
     }
 
     profile.studyPlanJSON = plan;
@@ -149,8 +174,7 @@ export class GamificationService {
 
     return {
       success: true,
-      profile,
-      message: 'Set level plan successfully',
+      data: profile,
     };
   }
 }
