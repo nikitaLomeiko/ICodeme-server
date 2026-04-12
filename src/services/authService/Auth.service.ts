@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Db } from 'mongodb';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 import { BaseMongoRepository } from '@core/db';
 
@@ -25,7 +26,18 @@ import {
 import { EmailService } from '@services/emailService';
 
 import config from '@core/config/jwt/jwt.config';
+import telegramConfig from '@core/config/telegram/telegram.config';
 import { AuthError } from './types';
+
+export interface ITelegramAuthData {
+  id: string;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: string;
+  hash: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -400,5 +412,117 @@ export class AuthService {
         refreshToken: refreshToken.token,
       },
     };
+  }
+
+  async validateOrCreateTelegramUser(
+    telegramId: string,
+    firstName: string,
+    lastName?: string,
+    username?: string,
+    photoUrl?: string,
+  ): Promise<IServiceResponse<IAuthResponse, AuthError>> {
+    const email = username
+      ? `${username}@telegram.com`
+      : `${telegramId}@telegram.com`;
+    let user = await this.repositoryUser.findOne({ telegramId });
+
+    if (!user) {
+      const now = new Date();
+      const name = `${firstName} ${lastName || ''}`.trim();
+      const newUser: IUser = {
+        _id: generateId(telegramId),
+        email,
+        name: name || `Telegram User ${telegramId}`,
+        provider: 'telegram',
+        telegramId,
+        picture: photoUrl,
+        username,
+        isEmailConfirmed: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const createdUserId = await this.repositoryUser.create(newUser);
+
+      if (!createdUserId) {
+        return {
+          success: false,
+          error: AuthError.USER_NOT_CREATED,
+        };
+      }
+
+      user = { ...newUser, _id: createdUserId };
+    } else if (user.provider !== 'telegram') {
+      return {
+        success: false,
+        error: AuthError.USER_EXISTS,
+      };
+    }
+
+    const accessToken: string = this.jwtHelper.generateAccessToken(user);
+
+    const refreshToken: IRefreshToken = this.jwtHelper.generateRefreshToken(
+      user,
+      config().ttl,
+    );
+
+    await this.repositoryRefreshToken.create(refreshToken);
+
+    return {
+      success: true,
+      data: {
+        token: accessToken,
+        refreshToken: refreshToken.token,
+      },
+    };
+  }
+
+  verifyTelegramAuthData(data: ITelegramAuthData): boolean {
+    try {
+      const botToken = telegramConfig().botToken;
+
+      if (!botToken) {
+        console.error('Telegram: TELEGRAM_BOT_TOKEN not set');
+        return false;
+      }
+
+      const { hash, auth_date, ...withoutHash } = data;
+
+      const dataCheckString = Object.keys(withoutHash)
+        .sort()
+        .map((key) => `${key}=${withoutHash[key as keyof typeof withoutHash]}`)
+        .join('\n');
+
+      console.log('Telegram dataCheckString:', dataCheckString);
+
+      const secretKey = crypto.createHash('sha256').update(botToken).digest();
+
+      const calculatedHash = crypto
+        .createHmac('sha256', secretKey)
+        .update(dataCheckString)
+        .digest('hex');
+
+      console.log('Telegram received hash:', hash);
+      console.log('Telegram calculated hash:', calculatedHash);
+
+      if (calculatedHash !== hash) {
+        console.error('Telegram: hash mismatch!');
+        return false;
+      }
+
+      const authDate = new Date(parseInt(auth_date, 10) * 1000);
+      const now = new Date();
+      const diffInSeconds = (now.getTime() - authDate.getTime()) / 1000;
+
+      if (diffInSeconds > 86400) {
+        console.error('Telegram: auth data expired');
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Telegram verification error:', err);
+      return false;
+    }
   }
 }

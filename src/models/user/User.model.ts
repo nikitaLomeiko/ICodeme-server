@@ -5,9 +5,10 @@ export interface IUser extends BaseEntity {
   email: string;
   password_hash?: string;
   isEmailConfirmed: boolean;
-  provider?: 'local' | 'google' | 'github';
+  provider?: 'local' | 'google' | 'github' | 'telegram';
   googleId?: string;
   githubId?: string;
+  telegramId?: string;
   picture?: string;
   username?: string;
 }

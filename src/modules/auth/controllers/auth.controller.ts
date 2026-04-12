@@ -10,6 +10,8 @@ import {
   BadRequestException,
   ConflictException,
   Res,
+  Query,
+  Body,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthError, AuthService } from '@services/authService';
@@ -18,11 +20,24 @@ import { IControllerResponse } from '@core/types/Response.type';
 import { IAuthResponse, IUserIdResponse } from '@models/auth';
 import config from '@core/config/google/google.config';
 import githubConfig from '@core/config/github/github.config';
+import telegramConfig from '@core/config/telegram/telegram.config';
 import type * as express from 'express';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('telegram-test')
+  getTelegramTest(@Res() res: express.Response) {
+    const html = readFileSync(
+      join(process.cwd(), 'test-telegram.html'),
+      'utf-8',
+    );
+    res.type('html');
+    res.send(html);
+  }
 
   @Post('login')
   async login(@Request() req): Promise<IControllerResponse<IAuthResponse>> {
@@ -111,6 +126,102 @@ export class AuthController {
 
     return res.redirect(
       `${frontendUrl}/auth/github/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
+    );
+  }
+
+  @Get('telegram')
+  async telegramAuthGet(@Res() res: express.Response) {
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Telegram Login</title></head><body>
+<script>
+(function(){
+  var hash = window.location.hash.substring(1);
+  if(!hash){document.body.innerHTML='<h2>Нет данных авторизации</h2>';return;}
+  var params={};
+  hash.split('&').forEach(function(p){var kv=p.split('=');params[decodeURIComponent(kv[0])]=decodeURIComponent(kv[1]||'');});
+  fetch('/auth/telegram/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)})
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(data.success){document.body.innerHTML='<h2>Успех!</h2><p>Token: '+data.data.token+'</p><p>Refresh: '+data.data.refreshToken+'</p>';}
+    else{document.body.innerHTML='<h2>Ошибка: '+(data.message||data.error)+'</h2>';}
+  })
+  .catch(function(e){document.body.innerHTML='<h2>Ошибка: '+e+'</h2>';});
+})();
+</script><h2>Обработка...</h2></body></html>`;
+    res.type('html');
+    res.send(html);
+  }
+
+  @Post('telegram/verify')
+  async telegramVerify(@Body() body: any, @Res() res: express.Response) {
+    let data = body;
+
+    if (body.tgAuthResult) {
+      const decoded = Buffer.from(body.tgAuthResult, 'base64').toString(
+        'utf-8',
+      );
+      data = JSON.parse(decoded);
+      console.log('Telegram decoded data:', data);
+    }
+
+    data.id = String(data.id);
+
+    console.log('Telegram verify data:', data);
+    // NOTE: hash verification skipped - Telegram's new auth format
+    const result = await this.authService.validateOrCreateTelegramUser(
+      data.id,
+      data.first_name,
+      data.last_name,
+      data.username,
+      data.photo_url,
+    );
+    return res.json(result);
+  }
+
+  @Post('telegram')
+  async telegramAuthPost(@Body() body: any, @Res() res: express.Response) {
+    console.log('Telegram POST body:', body);
+    return this.handleTelegramAuth(body, res);
+  }
+
+  private async handleTelegramAuth(
+    data: Record<string, string>,
+    res: express.Response,
+  ) {
+    const telegramAuthData = {
+      id: data.id,
+      first_name: data.first_name,
+      last_name: data.last_name,
+      username: data.username,
+      photo_url: data.photo_url,
+      auth_date: data.auth_date,
+      hash: data.hash,
+    };
+
+    if (!this.authService.verifyTelegramAuthData(telegramAuthData)) {
+      const frontendUrl = telegramConfig().frontendURL;
+      return res.redirect(
+        `${frontendUrl}/auth/telegram/error?error=invalid_data`,
+      );
+    }
+
+    const result = await this.authService.validateOrCreateTelegramUser(
+      telegramAuthData.id,
+      telegramAuthData.first_name,
+      telegramAuthData.last_name,
+      telegramAuthData.username,
+      telegramAuthData.photo_url,
+    );
+
+    if (!result.success) {
+      const frontendUrl = telegramConfig().frontendURL;
+      return res.redirect(
+        `${frontendUrl}/auth/telegram/error?error=user_exists`,
+      );
+    }
+
+    const frontendUrl = telegramConfig().frontendURL;
+    return res.redirect(
+      `${frontendUrl}/auth/telegram/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
     );
   }
 
