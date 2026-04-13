@@ -10,10 +10,12 @@ import {
   AuthService,
   GoogleStrategy,
   GitHubStrategy,
+  OauthService,
 } from '@services/authService';
 import config from '@core/config/jwt/jwt.config';
 
 import * as dotenv from 'dotenv';
+import { OAuthController } from './controllers/oauth.controller';
 
 dotenv.config();
 
@@ -27,7 +29,7 @@ dotenv.config();
     GeneralModule,
     EmailModule,
   ],
-  providers: [AuthService, GoogleStrategy, GitHubStrategy],
-  controllers: [AuthController],
+  providers: [AuthService, OauthService, GoogleStrategy, GitHubStrategy],
+  controllers: [AuthController, OAuthController],
 })
 export class AuthModule {}

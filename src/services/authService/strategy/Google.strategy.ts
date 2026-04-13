@@ -6,6 +6,7 @@ import config from '@core/config/google/google.config';
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor() {
+    console.log('Google callbackURL:', config().callbackURL);
     super({
       clientID: config().clientID,
       clientSecret: config().clientSecret,

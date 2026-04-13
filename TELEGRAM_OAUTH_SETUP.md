@@ -57,15 +57,20 @@ Telegram использует не стандартный OAuth редирект
 - `YOUR_BOT_NAME` — username вашего бота (без `@`)
 - `data-auth-url` — URL вашего сервера для обработки
 
-#### Вариант 2: Ссылка-виджет
+#### Вариант 2: Ссылка-виджет (OAuth редирект)
 
 ```html
 <a
-  href="https://oauth.telegram.org/auth?bot_id=8694368343&origin=http://localhost:3000&return_to=http://localhost:3000/auth/telegram"
+  href="https://oauth.telegram.org/auth?bot_id=8694368343&origin=http://127.0.0.1:3000&return_to=http://127.0.0.1:3000/oauth/telegram"
 >
   Войти через Telegram
 </a>
 ```
+
+**Важно**: `return_to` должен указывать на `http://127.0.0.1:3000/oauth/telegram` (или ваш домен).
+
+После авторизации Telegram редиректит на `/oauth/telegram` с данными в hash (`#id=...&first_name=...`).
+Сервер автоматически извлекает эти данные на клиенте и отправляет на `/oauth/telegram/verify` для проверки и создания пользователя.
 
 Для этого нужен `bot_id` — числовой ID бота (не токен). Узнать можно через API:
 

@@ -10,17 +10,12 @@ import {
   BadRequestException,
   ConflictException,
   Res,
-  Query,
-  Body,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthError, AuthService } from '@services/authService';
 import { IUser } from '@models/user';
 import { IControllerResponse } from '@core/types/Response.type';
 import { IAuthResponse, IUserIdResponse } from '@models/auth';
-import config from '@core/config/google/google.config';
-import githubConfig from '@core/config/github/github.config';
-import telegramConfig from '@core/config/telegram/telegram.config';
 import type * as express from 'express';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -68,161 +63,6 @@ export class AuthController {
       ...result,
       message: 'Authorization completed successfully',
     };
-  }
-
-  @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleAuth() {
-    // Redirects to Google automatically by Passport
-  }
-
-  @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(@Request() req, @Res() res: express.Response) {
-    const googleUser = req.user;
-
-    const result = await this.authService.validateOrCreateGoogleUser(
-      googleUser.picture?.split('/')[4] || googleUser.email,
-      googleUser.email,
-      `${googleUser.name?.givenName || ''} ${googleUser.name?.familyName || ''}`.trim(),
-      googleUser.picture,
-    );
-
-    if (!result.success) {
-      const frontendUrl = config().frontendURL;
-      return res.redirect(`${frontendUrl}/auth/google/error?error=user_exists`);
-    }
-
-    const frontendUrl = config().frontendURL;
-    return res.redirect(
-      `${frontendUrl}/auth/google/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
-    );
-  }
-
-  @Get('github')
-  @UseGuards(AuthGuard('github'))
-  async githubAuth() {
-    // Redirects to GitHub automatically by Passport
-  }
-
-  @Get('github/callback')
-  @UseGuards(AuthGuard('github'))
-  async githubAuthRedirect(@Request() req, @Res() res: express.Response) {
-    const githubUser = req.user;
-
-    const result = await this.authService.validateOrCreateGitHubUser(
-      githubUser.githubId,
-      githubUser.email,
-      githubUser.name,
-      githubUser.picture,
-      githubUser.username,
-    );
-
-    const frontendUrl = githubConfig().frontendURL;
-
-    if (!result.success) {
-      return res.redirect(`${frontendUrl}/auth/github/error?error=user_exists`);
-    }
-
-    return res.redirect(
-      `${frontendUrl}/auth/github/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
-    );
-  }
-
-  @Get('telegram')
-  async telegramAuthGet(@Res() res: express.Response) {
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Telegram Login</title></head><body>
-<script>
-(function(){
-  var hash = window.location.hash.substring(1);
-  if(!hash){document.body.innerHTML='<h2>Нет данных авторизации</h2>';return;}
-  var params={};
-  hash.split('&').forEach(function(p){var kv=p.split('=');params[decodeURIComponent(kv[0])]=decodeURIComponent(kv[1]||'');});
-  fetch('/auth/telegram/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)})
-  .then(function(r){return r.json();})
-  .then(function(data){
-    if(data.success){document.body.innerHTML='<h2>Успех!</h2><p>Token: '+data.data.token+'</p><p>Refresh: '+data.data.refreshToken+'</p>';}
-    else{document.body.innerHTML='<h2>Ошибка: '+(data.message||data.error)+'</h2>';}
-  })
-  .catch(function(e){document.body.innerHTML='<h2>Ошибка: '+e+'</h2>';});
-})();
-</script><h2>Обработка...</h2></body></html>`;
-    res.type('html');
-    res.send(html);
-  }
-
-  @Post('telegram/verify')
-  async telegramVerify(@Body() body: any, @Res() res: express.Response) {
-    let data = body;
-
-    if (body.tgAuthResult) {
-      const decoded = Buffer.from(body.tgAuthResult, 'base64').toString(
-        'utf-8',
-      );
-      data = JSON.parse(decoded);
-      console.log('Telegram decoded data:', data);
-    }
-
-    data.id = String(data.id);
-
-    console.log('Telegram verify data:', data);
-    // NOTE: hash verification skipped - Telegram's new auth format
-    const result = await this.authService.validateOrCreateTelegramUser(
-      data.id,
-      data.first_name,
-      data.last_name,
-      data.username,
-      data.photo_url,
-    );
-    return res.json(result);
-  }
-
-  @Post('telegram')
-  async telegramAuthPost(@Body() body: any, @Res() res: express.Response) {
-    console.log('Telegram POST body:', body);
-    return this.handleTelegramAuth(body, res);
-  }
-
-  private async handleTelegramAuth(
-    data: Record<string, string>,
-    res: express.Response,
-  ) {
-    const telegramAuthData = {
-      id: data.id,
-      first_name: data.first_name,
-      last_name: data.last_name,
-      username: data.username,
-      photo_url: data.photo_url,
-      auth_date: data.auth_date,
-      hash: data.hash,
-    };
-
-    if (!this.authService.verifyTelegramAuthData(telegramAuthData)) {
-      const frontendUrl = telegramConfig().frontendURL;
-      return res.redirect(
-        `${frontendUrl}/auth/telegram/error?error=invalid_data`,
-      );
-    }
-
-    const result = await this.authService.validateOrCreateTelegramUser(
-      telegramAuthData.id,
-      telegramAuthData.first_name,
-      telegramAuthData.last_name,
-      telegramAuthData.username,
-      telegramAuthData.photo_url,
-    );
-
-    if (!result.success) {
-      const frontendUrl = telegramConfig().frontendURL;
-      return res.redirect(
-        `${frontendUrl}/auth/telegram/error?error=user_exists`,
-      );
-    }
-
-    const frontendUrl = telegramConfig().frontendURL;
-    return res.redirect(
-      `${frontendUrl}/auth/telegram/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
-    );
   }
 
   @Post('register')
