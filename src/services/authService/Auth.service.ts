@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { BaseMongoRepository } from '@core/db';
 
 import { JwtHelper } from './helpers/Jwt.helper';
+import { TokenHelper } from './helpers/Token.helper';
 import { generateId } from '@core/helpers/GenerateId';
 import { generateConfirmCode } from './helpers/Generate.confirm.code';
 import { IServiceResponse } from '@core/types/Response.type';
@@ -18,6 +19,7 @@ import {
 import {
   IAuthResponse,
   IRefreshToken,
+  ITokenResponse,
   IUserIdResponse,
   RefreshTokenKey,
 } from '@models/auth';
@@ -26,6 +28,7 @@ import { EmailService } from '@services/emailService';
 
 import config from '@core/config/jwt/jwt.config';
 import { AuthError } from './types';
+import { error } from 'console';
 
 export interface ITelegramAuthData {
   id: string;
@@ -43,6 +46,7 @@ export class AuthService {
   private repositoryConfirmationCode: BaseMongoRepository<IConfirmationCode>;
   private repositoryRefreshToken: BaseMongoRepository<IRefreshToken>;
   private jwtHelper: JwtHelper;
+  private tokenHelper: TokenHelper;
 
   constructor(
     db: Db,
@@ -61,6 +65,12 @@ export class AuthService {
       new BaseMongoRepository<IConfirmationCode>(collectionConfirmationCode);
 
     this.jwtHelper = new JwtHelper(this.jwtService);
+    this.tokenHelper = new TokenHelper(
+      this.jwtService,
+      this.repositoryRefreshToken,
+      this.repositoryUser,
+      this.jwtHelper,
+    );
     this.emailService = emailService;
   }
 
@@ -78,7 +88,7 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(
       password,
-      existingUser.password_hash || '', // TASK
+      existingUser.password_hash || '',
     );
 
     if (!isPasswordValid) {
@@ -91,6 +101,8 @@ export class AuthService {
         error: AuthError.MAIL_NOT_CONFIRMED,
       };
     }
+
+    this.repositoryRefreshToken.delete({ userId: existingUser._id });
 
     const accessToken: string =
       this.jwtHelper.generateAccessToken(existingUser);
@@ -105,18 +117,20 @@ export class AuthService {
     return {
       success: true,
       data: {
-        token: accessToken,
+        email: existingUser.email,
+        userId: existingUser._id,
+        accessToken,
         refreshToken: refreshToken.token,
       },
     };
   }
 
   async register(
-    userData: Omit<IUser, 'password_hash'>,
+    email: string,
     password: string,
   ): Promise<IServiceResponse<IUserIdResponse, AuthError>> {
     const existingUser = await this.repositoryUser.findOne({
-      email: userData.email,
+      email: email,
     });
 
     if (existingUser) {
@@ -127,12 +141,14 @@ export class AuthService {
 
     const now = new Date();
     const newUser: IUser = {
-      ...userData,
+      name: `new user_${generateId(email)}`,
+      email: email,
       password_hash: hashedPassword,
       createdAt: now,
       updatedAt: now,
-      _id: generateId(userData.email),
+      _id: generateId(email),
       isEmailConfirmed: false,
+      isResetPassword: false,
     };
 
     const resultCreatedUser = await this.repositoryUser.create(newUser);
@@ -153,6 +169,7 @@ export class AuthService {
   async confirmCode(
     code: string,
     userId: string,
+    updateData: Partial<{ [key: string]: any }>,
   ): Promise<IServiceResponse<null, AuthError>> {
     const user = await this.repositoryUser.findOne({ _id: userId });
 
@@ -163,7 +180,7 @@ export class AuthService {
       };
     }
 
-    if (user.isEmailConfirmed) {
+    if ('isEmailConfirmed' in updateData && user.isEmailConfirmed) {
       return {
         success: false,
         error: AuthError.MAIL_CONFIRMED,
@@ -196,7 +213,7 @@ export class AuthService {
 
     const resultUpdatedUser = await this.repositoryUser.update(
       { _id: userId },
-      { ...user, isEmailConfirmed: true },
+      { ...user, ...updateData },
     );
 
     if (!resultUpdatedUser) {
@@ -213,46 +230,43 @@ export class AuthService {
 
   async refreshToken(
     token: string,
-  ): Promise<IServiceResponse<IAuthResponse, AuthError>> {
-    const existingToken = await this.repositoryRefreshToken.findOne({
-      token,
-    });
+  ): Promise<IServiceResponse<ITokenResponse, AuthError>> {
+    return this.tokenHelper.refreshToken(token);
+  }
 
-    if (!existingToken || existingToken.expiresAt < new Date()) {
-      return { success: false, error: AuthError.INVALID_TOKEN };
-    }
-
-    const user = await this.repositoryUser.findOne({
-      _id: existingToken.userId,
-    });
+  async resetPassword(
+    userId: string,
+    newPassword: string,
+  ): Promise<IServiceResponse<null, AuthError>> {
+    const user = await this.repositoryUser.findOne({ _id: userId });
 
     if (!user) {
       return { success: false, error: AuthError.USER_NOT_FOUND };
     }
 
-    const accessToken: string = this.jwtHelper.generateAccessToken(user);
+    if (!user.isEmailConfirmed) {
+      return { success: false, error: AuthError.INVALID_CREDENTIALS };
+    }
 
-    await this.repositoryRefreshToken.delete({ token });
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    const newRefreshToken: IRefreshToken = this.jwtHelper.generateRefreshToken(
-      user,
-      config().ttl,
+    const result = await this.repositoryUser.update(
+      { _id: userId },
+      { ...user, password_hash: hashedPassword, isResetPassword: false },
     );
 
-    this.repositoryRefreshToken.create(newRefreshToken);
+    if (!result) {
+      return { success: false, error: AuthError.USER_NOT_UPDATED };
+    }
 
     return {
       success: true,
-      data: {
-        token: accessToken,
-        refreshToken: newRefreshToken.token,
-      },
     };
   }
 
   async generateAndSendConfirmCode(
     email: string,
-  ): Promise<IServiceResponse<null, AuthError>> {
+  ): Promise<IServiceResponse<IUserIdResponse, AuthError>> {
     const user = await this.repositoryUser.findOne({ email });
 
     if (!user) {
@@ -261,6 +275,8 @@ export class AuthService {
         error: AuthError.INVALID_CREDENTIALS,
       };
     }
+
+    await this.repositoryConfirmationCode.delete({ userId: user._id });
 
     const now = new Date();
     const code = generateConfirmCode();
@@ -292,7 +308,15 @@ export class AuthService {
     });
 
     return {
+      data: { userId: user._id },
       success: true,
     };
+  }
+
+  async validateTokens(
+    accessToken: string,
+    refreshToken: string,
+  ): Promise<IServiceResponse<boolean, AuthError>> {
+    return this.tokenHelper.validateTokens(accessToken, refreshToken);
   }
 }

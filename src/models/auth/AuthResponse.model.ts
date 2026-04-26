@@ -1,5 +1,10 @@
-export interface IAuthResponse {
-  token: string;
+export interface IAuthResponse extends ITokenResponse {
+  userId: string;
+  email: string;
+}
+
+export interface ITokenResponse {
+  accessToken: string;
   refreshToken: string;
 }
 

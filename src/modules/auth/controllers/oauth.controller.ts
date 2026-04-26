@@ -38,11 +38,11 @@ export class OAuthController {
     const frontendUrl = config().frontendURL;
 
     if (!result.success) {
-      return res.redirect(`${frontendUrl}/auth/error?error=user_exists`);
+      return res.redirect(`${frontendUrl}/oauth/error?error=user_exists`);
     }
 
     return res.redirect(
-      `${frontendUrl}/auth/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
+      `${frontendUrl}/oauth/success?token=${result.data?.accessToken}&refreshToken=${result.data?.refreshToken}&userId=${result.data?.userId}&email=${googleUser.email}`,
     );
   }
 
@@ -66,17 +66,19 @@ export class OAuthController {
     const frontendUrl = githubConfig().frontendURL;
 
     if (!result.success) {
-      return res.redirect(`${frontendUrl}/auth/error?error=user_exists`);
+      return res.redirect(`${frontendUrl}/oauth/error?error=user_exists`);
     }
 
     return res.redirect(
-      `${frontendUrl}/auth/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
+      `${frontendUrl}/oauth/success?token=${result.data?.accessToken}&refreshToken=${result.data?.refreshToken}&userId=${result.data?.userId}&email=${githubUser.email}`,
     );
   }
 
   @Post('telegram/verify')
   async telegramVerify(@Body() body: any, @Res() res: express.Response) {
     let data = body;
+
+    console.log(body);
 
     if (body.tgAuthResult) {
       const decoded = Buffer.from(body.tgAuthResult, 'base64').toString(
@@ -105,7 +107,16 @@ export class OAuthController {
         data.username,
         data.photo_url,
       );
-      return res.json(result);
+
+      return res.json({
+        ...result,
+        data: {
+          token: result.data?.accessToken,
+          refreshToken: result.data?.refreshToken,
+          userId: result.data?.userId,
+          email: data.username,
+        },
+      });
     } catch (error) {
       console.error('Telegram verify error:', error);
       return res.status(500).json({
@@ -142,12 +153,12 @@ export class OAuthController {
 
     if (!result.success) {
       const frontendUrl = telegramConfig().frontendURL;
-      return res.redirect(`${frontendUrl}/auth/error?error=user_exists`);
+      return res.redirect(`${frontendUrl}/oauth/error?error=user_exists`);
     }
 
     const frontendUrl = telegramConfig().frontendURL;
     return res.redirect(
-      `${frontendUrl}/auth/success?token=${result.data?.token}&refreshToken=${result.data?.refreshToken}`,
+      `${frontendUrl}/oauth/success?token=${result.data?.accessToken}&refreshToken=${result.data?.refreshToken}&userId=${result.data?.userId}&email=${telegramAuthData.username}`,
     );
   }
 }

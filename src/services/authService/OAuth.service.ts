@@ -6,11 +6,17 @@ import * as crypto from 'crypto';
 import { BaseMongoRepository } from '@core/db';
 
 import { JwtHelper } from './helpers/Jwt.helper';
+import { TokenHelper } from './helpers/Token.helper';
 import { generateId } from '@core/helpers/GenerateId';
 import { IServiceResponse } from '@core/types/Response.type';
 
 import { IUser, UserKey } from '@models/user';
-import { IAuthResponse, IRefreshToken, RefreshTokenKey } from '@models/auth';
+import {
+  IRefreshToken,
+  ITokenResponse,
+  IUserIdResponse,
+  RefreshTokenKey,
+} from '@models/auth';
 
 import config from '@core/config/jwt/jwt.config';
 import telegramConfig from '@core/config/telegram/telegram.config';
@@ -22,6 +28,7 @@ export class OauthService {
   private repositoryUser: BaseMongoRepository<IUser>;
   private repositoryRefreshToken: BaseMongoRepository<IRefreshToken>;
   private jwtHelper: JwtHelper;
+  private tokenHelper: TokenHelper;
 
   constructor(
     db: Db,
@@ -36,6 +43,12 @@ export class OauthService {
     );
 
     this.jwtHelper = new JwtHelper(this.jwtService);
+    this.tokenHelper = new TokenHelper(
+      this.jwtService,
+      this.repositoryRefreshToken,
+      this.repositoryUser,
+      this.jwtHelper,
+    );
   }
 
   async validateOrCreateGoogleUser(
@@ -43,7 +56,7 @@ export class OauthService {
     email: string,
     name: string,
     picture?: string,
-  ): Promise<IServiceResponse<IAuthResponse, AuthError>> {
+  ): Promise<IServiceResponse<ITokenResponse & IUserIdResponse, AuthError>> {
     let user = await this.repositoryUser.findOne({ email });
 
     if (!user) {
@@ -56,6 +69,7 @@ export class OauthService {
         googleId,
         picture,
         isEmailConfirmed: true,
+        isResetPassword: false,
         createdAt: now,
         updatedAt: now,
       };
@@ -77,22 +91,7 @@ export class OauthService {
       };
     }
 
-    const accessToken: string = this.jwtHelper.generateAccessToken(user);
-
-    const refreshToken: IRefreshToken = this.jwtHelper.generateRefreshToken(
-      user,
-      config().ttl,
-    );
-
-    await this.repositoryRefreshToken.create(refreshToken);
-
-    return {
-      success: true,
-      data: {
-        token: accessToken,
-        refreshToken: refreshToken.token,
-      },
-    };
+    return this.tokenHelper.issueTokens(user);
   }
 
   async validateOrCreateGitHubUser(
@@ -101,7 +100,7 @@ export class OauthService {
     name: string,
     picture?: string,
     username?: string,
-  ): Promise<IServiceResponse<IAuthResponse, AuthError>> {
+  ): Promise<IServiceResponse<ITokenResponse & IUserIdResponse, AuthError>> {
     let user = await this.repositoryUser.findOne({ email });
 
     if (!user) {
@@ -115,6 +114,7 @@ export class OauthService {
         picture,
         username,
         isEmailConfirmed: true,
+        isResetPassword: false,
         createdAt: now,
         updatedAt: now,
       };
@@ -136,22 +136,7 @@ export class OauthService {
       };
     }
 
-    const accessToken: string = this.jwtHelper.generateAccessToken(user);
-
-    const refreshToken: IRefreshToken = this.jwtHelper.generateRefreshToken(
-      user,
-      config().ttl,
-    );
-
-    await this.repositoryRefreshToken.create(refreshToken);
-
-    return {
-      success: true,
-      data: {
-        token: accessToken,
-        refreshToken: refreshToken.token,
-      },
-    };
+    return this.tokenHelper.issueTokens(user);
   }
 
   async validateOrCreateTelegramUser(
@@ -160,7 +145,7 @@ export class OauthService {
     lastName?: string,
     username?: string,
     photoUrl?: string,
-  ): Promise<IServiceResponse<IAuthResponse, AuthError>> {
+  ): Promise<IServiceResponse<ITokenResponse & IUserIdResponse, AuthError>> {
     const email = username
       ? `${username}@telegram.com`
       : `${telegramId}@telegram.com`;
@@ -178,6 +163,7 @@ export class OauthService {
         picture: photoUrl,
         username,
         isEmailConfirmed: true,
+        isResetPassword: false,
         createdAt: now,
         updatedAt: now,
       };
@@ -199,22 +185,7 @@ export class OauthService {
       };
     }
 
-    const accessToken: string = this.jwtHelper.generateAccessToken(user);
-
-    const refreshToken: IRefreshToken = this.jwtHelper.generateRefreshToken(
-      user,
-      config().ttl,
-    );
-
-    await this.repositoryRefreshToken.create(refreshToken);
-
-    return {
-      success: true,
-      data: {
-        token: accessToken,
-        refreshToken: refreshToken.token,
-      },
-    };
+    return this.tokenHelper.issueTokens(user);
   }
 
   verifyTelegramAuthData(data: ITelegramAuthData): boolean {

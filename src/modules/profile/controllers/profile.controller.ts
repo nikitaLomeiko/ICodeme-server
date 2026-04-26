@@ -14,6 +14,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { IProfile, IProfileData } from '@models/profile/Profile.model';
 import { ProfileService } from '@services/profileService';
 import { IControllerResponse } from '@core/types/Response.type';
+import { ProfileError } from '@services/profileService/types/Error.types';
 
 @Controller('profiles')
 @UseGuards(AuthGuard('jwt'))
@@ -24,8 +25,8 @@ export class ProfileController {
   async getMyProfile(@Request() req): Promise<IControllerResponse<IProfile>> {
     const result = await this.profileService.getProfileById(req.user.userId);
 
-    if (!result.success) {
-      throw new NotFoundException(result.error);
+    if (result.error === ProfileError.PROFILE_NOT_FOUND) {
+      throw new NotFoundException('Profile not found');
     }
 
     return result;

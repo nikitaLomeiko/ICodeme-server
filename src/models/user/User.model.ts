@@ -5,6 +5,7 @@ export interface IUser extends BaseEntity {
   email: string;
   password_hash?: string;
   isEmailConfirmed: boolean;
+  isResetPassword: boolean;
   provider?: 'local' | 'google' | 'github' | 'telegram';
   googleId?: string;
   githubId?: string;
