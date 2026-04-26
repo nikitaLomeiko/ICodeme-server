@@ -44,7 +44,7 @@ export class ProfileController {
     );
 
     if (!result.success) {
-      throw new BadRequestException(result.error);
+      throw new BadRequestException('Error when creating a profile');
     }
 
     return result;

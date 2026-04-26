@@ -14,7 +14,7 @@ export interface IProfile extends BaseEntity {
 
 export interface IProfileData {
   avatar: string;
-  status: string;
+  name: string;
   about: string;
 }
 
