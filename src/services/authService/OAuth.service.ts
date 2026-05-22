@@ -18,7 +18,6 @@ import {
   RefreshTokenKey,
 } from '@models/auth';
 
-import config from '@core/config/jwt/jwt.config';
 import telegramConfig from '@core/config/telegram/telegram.config';
 import { AuthError } from './types';
 import { ITelegramAuthData } from './Auth.service';
@@ -122,6 +121,7 @@ export class OauthService {
       const createdUserId = await this.repositoryUser.create(newUser);
 
       if (!createdUserId) {
+        console.log('USER_NOT_CREATED');
         return {
           success: false,
           error: AuthError.USER_NOT_CREATED,
@@ -130,6 +130,7 @@ export class OauthService {
 
       user = { ...newUser, _id: createdUserId };
     } else if (user.provider !== 'github') {
+      console.log('USER_EXISTS');
       return {
         success: false,
         error: AuthError.USER_EXISTS,

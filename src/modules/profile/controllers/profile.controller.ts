@@ -35,12 +35,11 @@ export class ProfileController {
   @Post('me')
   async createNewProfile(
     @Request() req,
-    @Body() data: { profile: IProfileData; programmingLanguage: string },
+    @Body() data: { profileData: IProfileData },
   ): Promise<IControllerResponse<IProfile>> {
     const result = await this.profileService.CreateNewProfile(
-      req.user,
-      data.profile,
-      data.programmingLanguage,
+      req.user.userId,
+      data.profileData,
     );
 
     if (!result.success) {

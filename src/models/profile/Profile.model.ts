@@ -1,15 +1,10 @@
 import { BaseEntity } from '@core/types/BaseEntity.abstract';
-import { INotation } from '@core/types/Notation.type';
-import { IQuiz } from '@models/quiz/Quiz.model';
 
 export interface IProfile extends BaseEntity {
   userId: string;
   data: IProfileData;
-  level: IPosition;
-  levelPlanJSON: IPosition[];
-  studyPlanJSON: IModule[];
-  study: IStudy;
-  stats: IStats;
+  level: ILevel;
+  achievements: IAchievement[];
 }
 
 export interface IProfileData {
@@ -18,40 +13,19 @@ export interface IProfileData {
   about: string;
 }
 
-export interface IPosition {
-  experienceToNextLevel: number;
-  positionCount: number;
-  positionName: string;
-}
-
-export interface IStudy {
-  programmingLanguage: string;
-  module: number;
-  level: number;
-  step: number;
-}
-
-export interface IStats {
+export interface ILevel {
   experience: number;
+  experienceToNextLevel: number;
+  currentLevel: number;
 }
 
-export interface IModule extends INotation {
-  levels: ILevel[];
-  //experience: number;
-}
-
-export interface ILevel extends INotation {
-  steps: IStep[];
-  //experience: number;
-}
-
-export interface IStep extends INotation {
-  type: 'document' | 'code' | 'quiz' | 'exam';
-  document?: string;
-  code?: string;
-  quiz?: IQuiz;
-  exam?: IQuiz;
-  //experience: number;
+export interface IAchievement {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  maxProgress: number;
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 }
 
 export const ProfileKey = 'profiles';

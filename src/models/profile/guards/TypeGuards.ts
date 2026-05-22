@@ -1,4 +1,4 @@
-import { IStep } from '@models/profile/Profile.model';
+import { IStep } from '@models/study';
 
 export class TypeGuards {
   static isStep(obj: any): obj is IStep {

@@ -1,25 +1,117 @@
 import { ChatSession } from '@core/ai';
 import { BaseFileStorage } from '@core/storage';
 import { INotation } from '@core/types/Notation.type';
-import { IStep } from '@models/profile/Profile.model';
-import { IQuiz } from '@models/quiz/Quiz.model';
+import { IModule, IQuiz, IStep, IStudy, StudyKey } from '@models/study';
 import { Injectable } from '@nestjs/common';
 import { applyPromptVariables } from './helpers/ApplyPromptVariables';
 import { extractJsonFromMarkdown } from './helpers/ExtractJsonFromMarkdown';
 import { TypeGuards as CoreTypeGuards } from '@core/types/guards/TypeGuards';
 import { TypeGuards as ProfileTypeGuards } from '@models/profile/guards/TypeGuards';
-import { TypeGuards as QuizTypeGuards } from '@models/quiz/guards/TypeGuards';
+import { TypeGuards as QuizTypeGuards } from '@models/study/guards/TypeGuards';
 import { IServiceResponse } from '@core/types/Response.type';
 import { StudyError } from './types';
+import { Db } from 'mongodb';
+import { BaseMongoRepository } from '@core/db';
+import { generateId } from '@core/helpers/GenerateId';
 
 @Injectable()
 export class StudyService {
   private path = 'data/prompts';
+  private repositoryStudy: BaseMongoRepository<IStudy>;
 
   constructor(
+    db: Db,
     private chat: ChatSession,
     private fileStorage: BaseFileStorage,
-  ) {}
+  ) {
+    const collectionStudy = db.collection(StudyKey);
+    this.repositoryStudy = new BaseMongoRepository<IStudy>(collectionStudy);
+  }
+
+  async getStudyByUserId(
+    userId: string,
+  ): Promise<IServiceResponse<IStudy[], StudyError>> {
+    const study = await this.repositoryStudy.find({
+      userId: userId,
+    });
+
+    return { success: true, data: study };
+  }
+
+  async createNewStudy(
+    programmingLanguage: string,
+    userId: string,
+  ): Promise<IServiceResponse<IStudy, StudyError>> {
+    const now = new Date();
+
+    const newStudy: IStudy = {
+      _id: generateId(programmingLanguage),
+      userId: userId,
+      levelPlanJSON: [],
+      level: {
+        experienceToNextLevel: 10,
+        positionCount: 0,
+        positionName: 'Beginner',
+      },
+      studyPlanJSON: [],
+      study: {
+        programmingLanguage,
+        module: 0,
+        moduleTitle: '',
+        level: 0,
+        levelTitle: '',
+        step: 0,
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.repositoryStudy.create(newStudy);
+
+    return { success: true, data: newStudy };
+  }
+
+  async removeStudyById(
+    id: string,
+    userId: string,
+  ): Promise<IServiceResponse<null, StudyError>> {
+    const study = await this.repositoryStudy.findOne({ _id: id });
+
+    if (!study) {
+      return { success: false, error: StudyError.STUDY_NOT_FOUND };
+    }
+
+    if (study.userId !== userId) {
+      return { success: false, error: StudyError.USER_NOT_FOUND };
+    }
+
+    await this.repositoryStudy.delete({ _id: id });
+
+    return { success: true, data: null };
+  }
+
+  async ChangeStudyPlanById(
+    studyPlanJSON: IModule[],
+    id: string,
+  ): Promise<IServiceResponse<IStudy, StudyError>> {
+    const study = await this.repositoryStudy.findOne({ _id: id });
+
+    if (!study) {
+      return { success: false, error: StudyError.USER_NOT_FOUND };
+    }
+
+    const now = new Date();
+
+    const newStudy = { ...study, studyPlanJSON, updatedAt: now };
+
+    const result = await this.repositoryStudy.update({ _id: id }, newStudy);
+
+    if (!result) {
+      return { success: false, error: StudyError.USER_NOT_FOUND };
+    }
+
+    return { success: true, data: newStudy };
+  }
 
   async generateStudyModules(
     language: string,

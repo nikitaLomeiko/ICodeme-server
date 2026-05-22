@@ -6,7 +6,7 @@ import {
   ICode,
   ITrueFolse,
   IQuestionError,
-} from '@models/quiz/Quiz.model';
+} from '../types/Quiz.types';
 
 export class TypeGuards {
   static isVariant(obj: any): obj is IVariant {

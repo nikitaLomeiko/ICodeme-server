@@ -1,4 +1,4 @@
-import { IPosition } from '@models/profile/Profile.model';
+import { IPosition } from '@models/study';
 
 export const Positions: Omit<IPosition, 'experienceToNextLevel'>[] = [
   {

@@ -1,48 +1,85 @@
 import {
   Controller,
+  Get,
   Post,
+  Delete,
   Body,
   Request,
   UseGuards,
   NotFoundException,
   BadRequestException,
+  Param,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { IModule, IStep } from '@models/profile/Profile.model';
+import { IModule, IStep, IStudy } from '@models/study';
 import { StudyService } from '@services/studyService/StudyService';
-import { ProfileService } from '@services/profileService';
 import { IControllerResponse } from '@core/types/Response.type';
 import { INotation } from '@core/types/Notation.type';
-import { IQuiz } from '@models/quiz/Quiz.model';
+import { IQuiz } from '@models/study';
 
 @Controller('study')
 @UseGuards(AuthGuard('jwt'))
 export class StudyController {
-  constructor(
-    private readonly studyService: StudyService,
-    private readonly profileService: ProfileService,
-  ) {}
+  constructor(private readonly studyService: StudyService) {}
+
+  @Get('me')
+  async getMyStudy(@Request() req): Promise<IControllerResponse<IStudy[]>> {
+    const result = await this.studyService.getStudyByUserId(req.user.userId);
+    return result;
+  }
+
+  @Post('me')
+  async createNewStudy(
+    @Request() req,
+    @Body() data: { programmingLanguage: string },
+  ): Promise<IControllerResponse<IStudy>> {
+    const result = await this.studyService.createNewStudy(
+      data.programmingLanguage,
+      req.user.userId,
+    );
+
+    if (!result.success) {
+      throw new BadRequestException('Error when creating a study');
+    }
+
+    return result;
+  }
+
+  @Delete('me/:studyId')
+  async deleteMyStudy(
+    @Request() req,
+    @Param('studyId') studyId: string,
+  ): Promise<IControllerResponse> {
+    const result = await this.studyService.removeStudyById(
+      studyId,
+      req.user.userId,
+    );
+
+    if (!result.success) {
+      throw new NotFoundException(result.error);
+    }
+
+    return result;
+  }
 
   @Post('modules')
   async generateStudyModule(
     @Request() req,
+    @Body() data: { studyId: string },
   ): Promise<IControllerResponse<IModule[]>> {
-    const result = await this.profileService.getProfileById(req.user.userId);
+    const result = await this.studyService.getStudyByUserId(req.user.userId);
+    const study = result.data?.find((item) => item._id === data.studyId);
 
-    const profile = result.data;
-
-    console.log(result, profile);
-
-    if (!result.success || !profile) {
+    if (!study) {
       throw new NotFoundException(result.error);
     }
 
-    if (profile.studyPlanJSON.length !== 0) {
+    if (study.studyPlanJSON.length !== 0) {
       throw new BadRequestException('Study plan already formed');
     }
 
     const resultGenerated = await this.studyService.generateStudyModules(
-      profile.study.programmingLanguage,
+      study.study.programmingLanguage,
     );
 
     const modules = resultGenerated.data;
@@ -62,9 +99,9 @@ export class StudyController {
       });
     });
 
-    const resultChanged = await this.profileService.ChangeStudyPlanById(
+    const resultChanged = await this.studyService.ChangeStudyPlanById(
       newStudyPlan,
-      req.user.userId,
+      data.studyId,
     );
 
     if (!resultChanged.success) {
@@ -77,29 +114,28 @@ export class StudyController {
   @Post('levels')
   async generateStudyLevels(
     @Request() req,
-    @Body() data: { moduleIndex: number },
+    @Body() data: { moduleIndex: number; studyId: string },
   ): Promise<IControllerResponse<INotation[]>> {
-    const result = await this.profileService.getProfileById(req.user.userId);
+    const result = await this.studyService.getStudyByUserId(req.user.userId);
+    const study = result.data?.find((item) => item._id === data.studyId);
 
-    const profile = result.data;
-
-    if (!result.success || !profile) {
+    if (!study) {
       throw new NotFoundException(result.error);
     }
 
-    if (profile.studyPlanJSON.length === 0) {
+    if (study.studyPlanJSON.length === 0) {
       throw new NotFoundException('Study plan not found');
     }
 
-    if (profile.studyPlanJSON.length < data.moduleIndex) {
+    if (study.studyPlanJSON.length < data.moduleIndex) {
       throw new NotFoundException('Study plan not found');
     }
 
-    const module = profile.studyPlanJSON[data.moduleIndex];
+    const module = study.studyPlanJSON[data.moduleIndex];
 
     const resultGenerated = await this.studyService.generateStudyLevels(
       module,
-      profile.study.programmingLanguage,
+      study.study.programmingLanguage,
     );
 
     const levels = resultGenerated.data;
@@ -117,11 +153,11 @@ export class StudyController {
       });
     });
 
-    profile.studyPlanJSON[data.moduleIndex] = module;
+    study.studyPlanJSON[data.moduleIndex] = module;
 
-    const resultChanged = await this.profileService.ChangeStudyPlanById(
-      profile.studyPlanJSON,
-      req.user.userId,
+    const resultChanged = await this.studyService.ChangeStudyPlanById(
+      study.studyPlanJSON,
+      data.studyId,
     );
 
     if (!resultChanged.success) {
@@ -134,37 +170,34 @@ export class StudyController {
   @Post('steps')
   async generateStudySteps(
     @Request() req,
-    @Body() data: { moduleIndex: number; levelIndex: number },
+    @Body() data: { moduleIndex: number; levelIndex: number; studyId: string },
   ): Promise<IControllerResponse<IStep[]>> {
-    const result = await this.profileService.getProfileById(req.user.userId);
+    const result = await this.studyService.getStudyByUserId(req.user.userId);
+    const study = result.data?.find((item) => item._id === data.studyId);
 
-    const profile = result.data;
-
-    if (!result.success || !profile) {
+    if (!study) {
       throw new NotFoundException(result.error);
     }
 
-    if (profile.studyPlanJSON.length === 0) {
+    if (study.studyPlanJSON.length === 0) {
       throw new NotFoundException('Study plan not found');
     }
 
-    if (profile.studyPlanJSON.length < data.moduleIndex) {
+    if (study.studyPlanJSON.length < data.moduleIndex) {
       throw new NotFoundException('Study plan not found');
     }
 
-    if (
-      profile.studyPlanJSON[data.moduleIndex].levels.length < data.levelIndex
-    ) {
+    if (study.studyPlanJSON[data.moduleIndex].levels.length < data.levelIndex) {
       throw new NotFoundException('Study plan not found');
     }
 
-    const module = profile.studyPlanJSON[data.moduleIndex];
+    const module = study.studyPlanJSON[data.moduleIndex];
     const level = module.levels[data.levelIndex];
 
     const resultGenerated = await this.studyService.generateStudySteps(
       module,
       level,
-      profile.study.programmingLanguage,
+      study.study.programmingLanguage,
     );
 
     const steps = resultGenerated.data;
@@ -179,11 +212,11 @@ export class StudyController {
       level.steps.push(step);
     });
 
-    profile.studyPlanJSON[data.moduleIndex].levels[data.levelIndex] = level;
+    study.studyPlanJSON[data.moduleIndex].levels[data.levelIndex] = level;
 
-    const resultChanged = await this.profileService.ChangeStudyPlanById(
-      profile.studyPlanJSON,
-      req.user.userId,
+    const resultChanged = await this.studyService.ChangeStudyPlanById(
+      study.studyPlanJSON,
+      data.studyId,
     );
 
     if (!resultChanged.success) {
@@ -197,38 +230,42 @@ export class StudyController {
   async generateStepDocumentation(
     @Request() req,
     @Body()
-    data: { moduleIndex: number; levelIndex: number; stepIndex: number },
+    data: {
+      moduleIndex: number;
+      levelIndex: number;
+      stepIndex: number;
+      studyId: string;
+    },
   ): Promise<IControllerResponse<string>> {
-    const result = await this.profileService.getProfileById(req.user.userId);
+    const result = await this.studyService.getStudyByUserId(req.user.userId);
+    const study = result.data?.find((item) => item._id === data.studyId);
 
-    const profile = result.data;
-
-    if (!result.success || !profile) {
+    if (!study) {
       throw new NotFoundException(result.error || 'Profile not found');
     }
 
-    if (profile.studyPlanJSON.length === 0) {
+    if (study.studyPlanJSON.length === 0) {
       throw new NotFoundException('Study plan not found');
     }
 
-    if (profile.studyPlanJSON.length <= data.moduleIndex) {
+    if (study.studyPlanJSON.length <= data.moduleIndex) {
       throw new NotFoundException('Module not found');
     }
 
     if (
-      profile.studyPlanJSON[data.moduleIndex].levels.length <= data.levelIndex
+      study.studyPlanJSON[data.moduleIndex].levels.length <= data.levelIndex
     ) {
       throw new NotFoundException('Level not found');
     }
 
     if (
-      profile.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps
+      study.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps
         .length <= data.stepIndex
     ) {
       throw new NotFoundException('Step not found');
     }
 
-    const module = profile.studyPlanJSON[data.moduleIndex];
+    const module = study.studyPlanJSON[data.moduleIndex];
     const level = module.levels[data.levelIndex];
     const step = level.steps[data.stepIndex];
 
@@ -236,7 +273,7 @@ export class StudyController {
       module,
       level,
       step,
-      profile.study.programmingLanguage,
+      study.study.programmingLanguage,
     );
 
     const document = resultGenerated.data;
@@ -247,13 +284,13 @@ export class StudyController {
       );
     }
 
-    profile.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps[
+    study.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps[
       data.stepIndex
     ].document = document;
 
-    const resultChanged = await this.profileService.ChangeStudyPlanById(
-      profile.studyPlanJSON,
-      req.user.userId,
+    const resultChanged = await this.studyService.ChangeStudyPlanById(
+      study.studyPlanJSON,
+      data.studyId,
     );
 
     if (!resultChanged.success) {
@@ -267,38 +304,42 @@ export class StudyController {
   async generateStepPractice(
     @Request() req,
     @Body()
-    data: { moduleIndex: number; levelIndex: number; stepIndex: number },
+    data: {
+      moduleIndex: number;
+      levelIndex: number;
+      stepIndex: number;
+      studyId: string;
+    },
   ): Promise<IControllerResponse<string>> {
-    const result = await this.profileService.getProfileById(req.user.userId);
+    const result = await this.studyService.getStudyByUserId(req.user.userId);
+    const study = result.data?.find((item) => item._id === data.studyId);
 
-    const profile = result.data;
-
-    if (!result.success || !profile) {
+    if (!study) {
       throw new NotFoundException(result.error || 'Profile not found');
     }
 
-    if (profile.studyPlanJSON.length === 0) {
+    if (study.studyPlanJSON.length === 0) {
       throw new NotFoundException('Study plan not found');
     }
 
-    if (profile.studyPlanJSON.length <= data.moduleIndex) {
+    if (study.studyPlanJSON.length <= data.moduleIndex) {
       throw new NotFoundException('Module not found');
     }
 
     if (
-      profile.studyPlanJSON[data.moduleIndex].levels.length <= data.levelIndex
+      study.studyPlanJSON[data.moduleIndex].levels.length <= data.levelIndex
     ) {
       throw new NotFoundException('Level not found');
     }
 
     if (
-      profile.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps
+      study.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps
         .length <= data.stepIndex
     ) {
       throw new NotFoundException('Step not found');
     }
 
-    const module = profile.studyPlanJSON[data.moduleIndex];
+    const module = study.studyPlanJSON[data.moduleIndex];
     const level = module.levels[data.levelIndex];
     const step = level.steps[data.stepIndex];
 
@@ -306,7 +347,7 @@ export class StudyController {
       module,
       level,
       step,
-      profile.study.programmingLanguage,
+      study.study.programmingLanguage,
     );
 
     const practice = resultGenerated.data;
@@ -317,13 +358,13 @@ export class StudyController {
       );
     }
 
-    profile.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps[
+    study.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps[
       data.stepIndex
     ].code = practice;
 
-    const resultChanged = await this.profileService.ChangeStudyPlanById(
-      profile.studyPlanJSON,
-      req.user.userId,
+    const resultChanged = await this.studyService.ChangeStudyPlanById(
+      study.studyPlanJSON,
+      data.studyId,
     );
 
     if (!resultChanged.success) {
@@ -340,38 +381,42 @@ export class StudyController {
   async generateStepQuiz(
     @Request() req,
     @Body()
-    data: { moduleIndex: number; levelIndex: number; stepIndex: number },
+    data: {
+      moduleIndex: number;
+      levelIndex: number;
+      stepIndex: number;
+      studyId: string;
+    },
   ): Promise<IControllerResponse<IQuiz>> {
-    const result = await this.profileService.getProfileById(req.user.userId);
+    const result = await this.studyService.getStudyByUserId(req.user.userId);
+    const study = result.data?.find((item) => item._id === data.studyId);
 
-    const profile = result.data;
-
-    if (!result.success || !profile) {
+    if (!study) {
       throw new NotFoundException(result.error || 'Profile not found');
     }
 
-    if (profile.studyPlanJSON.length === 0) {
+    if (study.studyPlanJSON.length === 0) {
       throw new NotFoundException('Study plan not found');
     }
 
-    if (profile.studyPlanJSON.length <= data.moduleIndex) {
+    if (study.studyPlanJSON.length <= data.moduleIndex) {
       throw new NotFoundException('Module not found');
     }
 
     if (
-      profile.studyPlanJSON[data.moduleIndex].levels.length <= data.levelIndex
+      study.studyPlanJSON[data.moduleIndex].levels.length <= data.levelIndex
     ) {
       throw new NotFoundException('Level not found');
     }
 
     if (
-      profile.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps
+      study.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps
         .length <= data.stepIndex
     ) {
       throw new NotFoundException('Step not found');
     }
 
-    const module = profile.studyPlanJSON[data.moduleIndex];
+    const module = study.studyPlanJSON[data.moduleIndex];
     const level = module.levels[data.levelIndex];
     const step = level.steps[data.stepIndex];
 
@@ -379,7 +424,7 @@ export class StudyController {
       module,
       level,
       step,
-      profile.study.programmingLanguage,
+      study.study.programmingLanguage,
     );
 
     const quiz = resultGenerated.data;
@@ -390,13 +435,13 @@ export class StudyController {
       );
     }
 
-    profile.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps[
+    study.studyPlanJSON[data.moduleIndex].levels[data.levelIndex].steps[
       data.stepIndex
     ].quiz = quiz;
 
-    const resultChanged = await this.profileService.ChangeStudyPlanById(
-      profile.studyPlanJSON,
-      req.user.userId,
+    const resultChanged = await this.studyService.ChangeStudyPlanById(
+      study.studyPlanJSON,
+      data.studyId,
     );
 
     if (!resultChanged.success) {
