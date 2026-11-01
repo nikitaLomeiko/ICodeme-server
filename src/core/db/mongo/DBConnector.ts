@@ -8,7 +8,11 @@ export class DBConnector implements IDBConnector<MongoClient> {
     private uri: string,
     private dbName: string = 'db',
   ) {
-    this.client = new MongoClient(this.uri);
+    this.client = new MongoClient(this.uri, {
+      tls: true,
+      tlsAllowInvalidCertificates: true,
+      serverSelectionTimeoutMS: 5000,
+    });
   }
 
   async connect(): Promise<void> {

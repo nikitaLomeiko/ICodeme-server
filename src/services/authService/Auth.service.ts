@@ -173,7 +173,10 @@ export class AuthService {
   ): Promise<IServiceResponse<null, AuthError>> {
     const user = await this.repositoryUser.findOne({ _id: userId });
 
+    console.log(userId);
+
     if (!user) {
+      console.log('USER_NOT_FOUND');
       return {
         success: false,
         error: AuthError.USER_NOT_FOUND,

@@ -78,14 +78,11 @@ export class OAuthController {
   async telegramVerify(@Body() body: any, @Res() res: express.Response) {
     let data = body;
 
-    console.log(body);
-
     if (body.tgAuthResult) {
       const decoded = Buffer.from(body.tgAuthResult, 'base64').toString(
         'utf-8',
       );
       data = JSON.parse(decoded);
-      console.log('Telegram decoded data:', data);
     }
 
     if (data.id) {
@@ -107,6 +104,16 @@ export class OAuthController {
         data.username,
         data.photo_url,
       );
+
+      console.log({
+        ...result,
+        data: {
+          token: result.data?.accessToken,
+          refreshToken: result.data?.refreshToken,
+          userId: result.data?.userId,
+          email: data.username,
+        },
+      });
 
       return res.json({
         ...result,

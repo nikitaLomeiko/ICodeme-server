@@ -21,4 +21,14 @@ export class BaseFileStorage extends BaseStorage {
   listFiles(directoryPath: string): string[] {
     return fs.readdirSync(directoryPath);
   }
+
+  createDir(path: string) {
+    fs.mkdirSync(path, { recursive: true });
+  }
+
+  deleteDir(path: string): void {
+    if (fs.existsSync(path)) {
+      fs.rmSync(path, { recursive: true, force: true });
+    }
+  }
 }

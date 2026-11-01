@@ -2,14 +2,12 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Delete,
   Body,
   Request,
   UseGuards,
   NotFoundException,
   BadRequestException,
-  Param,
   Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';

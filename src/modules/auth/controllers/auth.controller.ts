@@ -15,23 +15,10 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthError, AuthService } from '@services/authService';
 import { IControllerResponse } from '@core/types/Response.type';
 import { IAuthResponse, ITokenResponse, IUserIdResponse } from '@models/auth';
-import type * as express from 'express';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  @Get('telegram-test')
-  getTelegramTest(@Res() res: express.Response) {
-    const html = readFileSync(
-      join(process.cwd(), 'test-telegram.html'),
-      'utf-8',
-    );
-    res.type('html');
-    res.send(html);
-  }
 
   @Post('login')
   async login(@Request() req): Promise<IControllerResponse<IAuthResponse>> {
@@ -228,6 +215,8 @@ export class AuthController {
       accessToken: string;
       refreshToken: string;
     };
+
+    console.log(accessToken);
 
     const result = await this.authService.validateTokens(
       accessToken,
