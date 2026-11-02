@@ -17,6 +17,18 @@ export const DataBaseProvider: Provider = {
 
     await connector.connect();
 
-    return connector.client.db(dbname);
+    const db = connector.client.db(dbname);
+    await Promise.all([
+      db
+        .collection('authRateLimits')
+        .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      db
+        .collection('refreshTokens')
+        .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      db
+        .collection('confirmations_code')
+        .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    ]);
+    return db;
   },
 };

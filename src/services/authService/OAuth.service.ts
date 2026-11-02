@@ -83,13 +83,21 @@ export class OauthService {
       }
 
       user = { ...newUser, _id: createdUserId };
-    } else if (user.provider !== 'google') {
+    } else if (
+      user.provider !== 'google' ||
+      (user.googleId !== googleId &&
+        user.googleId !== user.email &&
+        user.googleId !== user.picture?.split('/')[4])
+    ) {
       return {
         success: false,
         error: AuthError.USER_EXISTS,
       };
     }
 
+    if (user.googleId !== googleId) {
+      await this.repositoryUser.update({ _id: user._id }, { googleId });
+    }
     return this.tokenHelper.issueTokens(user);
   }
 
@@ -129,7 +137,7 @@ export class OauthService {
       }
 
       user = { ...newUser, _id: createdUserId };
-    } else if (user.provider !== 'github') {
+    } else if (user.provider !== 'github' || user.githubId !== githubId) {
       console.log('USER_EXISTS');
       return {
         success: false,
@@ -192,40 +200,48 @@ export class OauthService {
   verifyTelegramAuthData(data: ITelegramAuthData): boolean {
     try {
       const botToken = telegramConfig().botToken;
-
-      if (!botToken) {
+      if (
+        !botToken ||
+        !data ||
+        typeof data !== 'object' ||
+        !/^[a-f0-9]{64}$/.test(data.hash) ||
+        !/^[0-9]+$/.test(String(data.id)) ||
+        typeof data.first_name !== 'string'
+      )
         return false;
-      }
-
-      const { hash, auth_date, ...withoutHash } = data;
-
-      const dataCheckString = Object.keys(withoutHash)
+      const allowed = [
+        'id',
+        'first_name',
+        'last_name',
+        'username',
+        'photo_url',
+        'auth_date',
+        'hash',
+      ];
+      if (
+        Object.entries(data).some(
+          ([key, value]) =>
+            !allowed.includes(key) ||
+            (value !== undefined &&
+              typeof value !== 'string' &&
+              typeof value !== 'number'),
+        )
+      )
+        return false;
+      const age = Date.now() / 1000 - Number(data.auth_date);
+      if (!Number.isFinite(age) || age < -30 || age > 300) return false;
+      const dataCheckString = Object.keys(data)
+        .filter((key) => key !== 'hash' && data[key] !== undefined)
         .sort()
-        .map((key) => `${key}=${withoutHash[key as keyof typeof withoutHash]}`)
+        .map((key) => `${key}=${data[key]}`)
         .join('\n');
-
-      const secretKey = crypto.createHash('sha256').update(botToken).digest();
-
-      const calculatedHash = crypto
-        .createHmac('sha256', secretKey)
+      const secret = crypto.createHash('sha256').update(botToken).digest();
+      const expected = crypto
+        .createHmac('sha256', secret)
         .update(dataCheckString)
-        .digest('hex');
-
-      if (calculatedHash !== hash) {
-        console.error('Telegram: hash mismatch!');
-        return false;
-      }
-
-      const authDate = new Date(parseInt(auth_date, 10) * 1000);
-      const now = new Date();
-      const diffInSeconds = (now.getTime() - authDate.getTime()) / 1000;
-
-      if (diffInSeconds > 86400) {
-        return false;
-      }
-
-      return true;
-    } catch (err) {
+        .digest();
+      return crypto.timingSafeEqual(expected, Buffer.from(data.hash, 'hex'));
+    } catch {
       return false;
     }
   }

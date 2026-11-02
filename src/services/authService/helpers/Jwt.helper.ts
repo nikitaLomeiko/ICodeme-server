@@ -11,11 +11,13 @@ export class JwtHelper {
     this.jwtService = service;
   }
 
-  generateAccessToken(user: IUser): string {
+  generateAccessToken(user: IUser, sid: string): string {
     const payload: IAuthTokenPayload = {
       login: user.email,
       sub: user._id,
       type: 'access',
+      sid,
+      version: user.authVersion || 0,
     };
 
     return this.jwtService.sign(payload);
@@ -29,6 +31,7 @@ export class JwtHelper {
     const refreshToken: IRefreshToken = {
       _id: generateId(token),
       token,
+      version: user.authVersion || 0,
       userId: user._id,
       createdAt: new Date(),
       updatedAt: new Date(),

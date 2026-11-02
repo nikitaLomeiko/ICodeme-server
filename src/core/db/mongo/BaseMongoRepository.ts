@@ -59,6 +59,17 @@ export class BaseMongoRepository<
     }
   }
 
+  async consume(filter: Partial<T>): Promise<T | null> {
+    const doc = await this.collection.findOneAndDelete(
+      this.mapToMongoFilter(filter),
+    );
+    return doc ? this.mapToEntity(doc) : null;
+  }
+
+  async deleteMany(filter: Partial<T>): Promise<void> {
+    await this.collection.deleteMany(this.mapToMongoFilter(filter));
+  }
+
   async delete(filter: Partial<T>): Promise<boolean> {
     try {
       const mongoFilter = this.mapToMongoFilter(filter);

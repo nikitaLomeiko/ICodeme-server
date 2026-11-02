@@ -1,3 +1,5 @@
+import { randomBytes, randomUUID } from 'crypto';
+import { hashToken } from './helpers/Token.helper';
 import { Injectable } from '@nestjs/common';
 import { Db } from 'mongodb';
 import { JwtService } from '@nestjs/jwt';
@@ -26,9 +28,7 @@ import {
 
 import { EmailService } from '@services/emailService';
 
-import config from '@core/config/jwt/jwt.config';
 import { AuthError } from './types';
-import { error } from 'console';
 
 export interface ITelegramAuthData {
   id: string;
@@ -49,7 +49,7 @@ export class AuthService {
   private tokenHelper: TokenHelper;
 
   constructor(
-    db: Db,
+    private db: Db,
     private jwtService: JwtService,
     private emailService: EmailService,
   ) {
@@ -102,26 +102,12 @@ export class AuthService {
       };
     }
 
-    this.repositoryRefreshToken.delete({ userId: existingUser._id });
-
-    const accessToken: string =
-      this.jwtHelper.generateAccessToken(existingUser);
-
-    const refreshToken: IRefreshToken = this.jwtHelper.generateRefreshToken(
-      existingUser,
-      config().ttl,
-    );
-
-    this.repositoryRefreshToken.create(refreshToken);
-
+    const result = await this.tokenHelper.issueTokens(existingUser);
     return {
-      success: true,
-      data: {
-        email: existingUser.email,
-        userId: existingUser._id,
-        accessToken,
-        refreshToken: refreshToken.token,
-      },
+      ...result,
+      data: result.data
+        ? { ...result.data, email: existingUser.email }
+        : undefined,
     };
   }
 
@@ -170,65 +156,45 @@ export class AuthService {
     code: string,
     userId: string,
     updateData: Partial<{ [key: string]: any }>,
-  ): Promise<IServiceResponse<null, AuthError>> {
-    const user = await this.repositoryUser.findOne({ _id: userId });
-
-    console.log(userId);
-
-    if (!user) {
-      console.log('USER_NOT_FOUND');
-      return {
-        success: false,
-        error: AuthError.USER_NOT_FOUND,
-      };
-    }
-
-    if ('isEmailConfirmed' in updateData && user.isEmailConfirmed) {
-      return {
-        success: false,
-        error: AuthError.MAIL_CONFIRMED,
-      };
-    }
-
-    const confirmCode = await this.repositoryConfirmationCode.findOne({
-      userId,
-    });
-
-    if (!confirmCode) {
-      return {
-        success: false,
-        error: AuthError.CONFIRMATION_CODE_NOT_CREATED,
-      };
-    }
-
-    const isConfirmCodeValid = await bcrypt.compare(code, confirmCode.codeHash);
-
-    if (!isConfirmCodeValid) {
-      return {
-        success: false,
-        error: AuthError.CODE_INCORRECT,
-      };
-    }
-
-    await this.repositoryConfirmationCode.delete({
-      codeHash: confirmCode.codeHash,
-    });
-
-    const resultUpdatedUser = await this.repositoryUser.update(
-      { _id: userId },
-      { ...user, ...updateData },
+  ): Promise<IServiceResponse<{ resetToken?: string }, AuthError>> {
+    const purpose = updateData.isResetPassword ? 'reset' : 'email';
+    const collection =
+      this.db.collection<IConfirmationCode>(ConfirmationCodeKey);
+    // Reserve an attempt before the expensive comparison, including concurrent requests.
+    const record = await collection.findOneAndUpdate(
+      { userId, purpose, expiresAt: { $gt: new Date() }, attempts: { $lt: 5 } },
+      { $inc: { attempts: 1 } },
+      { returnDocument: 'after' },
     );
-
-    if (!resultUpdatedUser) {
-      return {
-        success: false,
-        error: AuthError.USER_NOT_UPDATED,
-      };
+    if (!record || !(await bcrypt.compare(code, record.codeHash)))
+      return { success: false, error: AuthError.CODE_INCORRECT };
+    if (
+      !(await collection.findOneAndDelete({
+        _id: record._id,
+        codeHash: record.codeHash,
+      }))
+    )
+      return { success: false, error: AuthError.CODE_INCORRECT };
+    if (purpose === 'reset') {
+      const resetToken = randomBytes(32).toString('hex');
+      await this.repositoryUser.update(
+        { _id: userId },
+        {
+          resetTokenHash: hashToken(resetToken),
+          resetExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      );
+      return { success: true, data: { resetToken } };
     }
+    await this.repositoryUser.update(
+      { _id: userId },
+      { isEmailConfirmed: true },
+    );
+    return { success: true };
+  }
 
-    return {
-      success: true,
-    };
+  async logout(token: unknown) {
+    await this.tokenHelper.revoke(token);
   }
 
   async refreshToken(
@@ -240,35 +206,32 @@ export class AuthService {
   async resetPassword(
     userId: string,
     newPassword: string,
+    resetToken: string,
   ): Promise<IServiceResponse<null, AuthError>> {
-    const user = await this.repositoryUser.findOne({ _id: userId });
-
-    if (!user) {
-      return { success: false, error: AuthError.USER_NOT_FOUND };
-    }
-
-    if (!user.isEmailConfirmed) {
+    if (typeof resetToken !== 'string' || !/^[a-f0-9]{64}$/.test(resetToken))
       return { success: false, error: AuthError.INVALID_CREDENTIALS };
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    const result = await this.repositoryUser.update(
-      { _id: userId },
-      { ...user, password_hash: hashedPassword, isResetPassword: false },
+    const password_hash = await bcrypt.hash(newPassword, 10);
+    const user = await this.db.collection<IUser>(UserKey).findOneAndUpdate(
+      {
+        _id: userId,
+        isEmailConfirmed: true,
+        resetTokenHash: hashToken(resetToken),
+        resetExpiresAt: { $gt: new Date() },
+      },
+      {
+        $set: { password_hash, isResetPassword: false },
+        $unset: { resetTokenHash: '', resetExpiresAt: '' },
+        $inc: { authVersion: 1 },
+      },
     );
-
-    if (!result) {
-      return { success: false, error: AuthError.USER_NOT_UPDATED };
-    }
-
-    return {
-      success: true,
-    };
+    if (!user) return { success: false, error: AuthError.INVALID_CREDENTIALS };
+    await this.repositoryRefreshToken.deleteMany({ userId });
+    return { success: true };
   }
 
   async generateAndSendConfirmCode(
     email: string,
+    purpose: 'email' | 'reset' = 'email',
   ): Promise<IServiceResponse<IUserIdResponse, AuthError>> {
     const user = await this.repositoryUser.findOne({ email });
 
@@ -279,7 +242,10 @@ export class AuthService {
       };
     }
 
-    await this.repositoryConfirmationCode.delete({ userId: user._id });
+    await this.repositoryConfirmationCode.deleteMany({
+      userId: user._id,
+      purpose,
+    });
 
     const now = new Date();
     const code = generateConfirmCode();
@@ -287,9 +253,12 @@ export class AuthService {
     const hashedConfirmCode = await bcrypt.hash(code, 10);
 
     const newCode: IConfirmationCode = {
-      _id: generateId(email),
+      _id: randomUUID(),
       userId: user._id,
       codeHash: hashedConfirmCode,
+      purpose,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -305,9 +274,34 @@ export class AuthService {
     }
 
     await this.emailService.sendEmail({
-      subject: `Код подтверждения`,
+      subject: 'Код подтверждения — ICodeme',
       to: email,
-      text: `${code}`,
+      text: `Здравствуйте!\n\nВаш код подтверждения: ${code}\n\nВведите его в приложении ICodeme. Если вы не запрашивали код, просто проигнорируйте это письмо.`,
+      html: `<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Код подтверждения — ICodeme</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#f4f6fb; font-family:Arial,Helvetica,sans-serif; color:#172033;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f6fb; padding:40px 16px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px; background:#ffffff; border-radius:20px; overflow:hidden;">
+          <tr><td style="height:6px; background:#6757e8; font-size:0; line-height:0;">&nbsp;</td></tr>
+          <tr><td style="padding:36px 40px 40px;">
+            <p style="margin:0 0 28px; color:#6757e8; font-size:18px; font-weight:700; letter-spacing:.3px;">ICodeme</p>
+            <h1 style="margin:0 0 14px; font-size:25px; line-height:1.3; color:#172033;">Подтвердите адрес почты</h1>
+            <p style="margin:0 0 26px; color:#667085; font-size:15px; line-height:1.6;">Введите этот код в приложении, чтобы продолжить:</p>
+            <div style="margin:0 0 26px; padding:20px 16px; border:1px solid #e8e7fb; border-radius:14px; background:#f8f7ff; text-align:center; color:#302879; font-size:32px; line-height:1.2; font-weight:700; letter-spacing:10px;">${code}</div>
+            <p style="margin:0 0 8px; color:#667085; font-size:14px; line-height:1.6;">Если вы не запрашивали код, просто проигнорируйте это письмо.</p>
+            <p style="margin:28px 0 0; padding-top:20px; border-top:1px solid #eef0f4; color:#98a2b3; font-size:12px; line-height:1.5;">Это автоматическое сообщение от ICodeme. Пожалуйста, не отвечайте на него.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`,
     });
 
     return {

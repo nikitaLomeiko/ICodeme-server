@@ -17,7 +17,7 @@ import { IControllerResponse } from '@core/types/Response.type';
 import { ProfileError } from '@services/profileService/types/Error.types';
 
 @Controller('ide/project')
-// @UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'))
 export class IdeProjectController {
   constructor() {}
 

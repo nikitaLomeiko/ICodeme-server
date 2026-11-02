@@ -1,240 +1,135 @@
 import {
   Controller,
-  ForbiddenException,
-  UnauthorizedException,
-  InternalServerErrorException,
   Get,
   Post,
   Request,
+  Res,
   UseGuards,
+  UnauthorizedException,
+  ForbiddenException,
   BadRequestException,
   ConflictException,
-  Res,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { AuthError, AuthService } from '@services/authService';
-import { IControllerResponse } from '@core/types/Response.type';
-import { IAuthResponse, ITokenResponse, IUserIdResponse } from '@models/auth';
+import type { Response } from 'express';
+import { AuthService, AuthError } from '@services/authService';
+import {
+  cookie,
+  setSession,
+  clearSession,
+  textField,
+} from '@services/authService/helpers/Auth.http';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  async login(@Request() req): Promise<IControllerResponse<IAuthResponse>> {
-    const { email, password } = req.body as { email: string; password: string };
-
-    const result = await this.authService.login(email, password);
-
-    if (result.error === AuthError.INVALID_CREDENTIALS) {
-      throw new UnauthorizedException('Invalid username or password');
-    }
-
+  async login(@Request() req, @Res({ passthrough: true }) res: Response) {
+    const email = textField(req.body, 'email', 3, 254);
+    const result = await this.authService.login(
+      email,
+      textField(req.body, 'password', 1, 72),
+    );
     if (result.error === AuthError.MAIL_NOT_CONFIRMED) {
-      const resultConfirmCode =
-        await this.authService.generateAndSendConfirmCode(email);
-
-      if (!resultConfirmCode.success) {
-        throw new InternalServerErrorException(
-          'An error occurred while generating the code',
-        );
-      }
-
-      throw new ForbiddenException(
-        'Please confirm your email before logging in',
-      );
+      await this.authService.generateAndSendConfirmCode(email, 'email');
+      throw new ForbiddenException('Подтвердите почту перед входом');
     }
-
+    if (!result.success || !result.data)
+      throw new UnauthorizedException('Неверная почта или пароль');
+    setSession(res, result.data);
     return {
-      ...result,
-      message: 'Authorization completed successfully',
+      success: true,
+      data: { userId: result.data.userId, email: result.data.email },
+      message: 'Вход выполнен',
     };
   }
 
   @Post('register')
-  async register(
-    @Request() req,
-  ): Promise<IControllerResponse<IUserIdResponse>> {
-    const { email, password } = req.body as {
-      email: string;
-      password: string;
-    };
-
-    const result = await this.authService.register(email, password);
-
-    if (result.error === AuthError.USER_EXISTS) {
-      throw new ConflictException('A user with such an email already exists');
-    }
-
-    if (result.error === AuthError.USER_NOT_CREATED) {
-      throw new InternalServerErrorException('Failed to create user');
-    }
-
-    const resultConfirmCode =
-      await this.authService.generateAndSendConfirmCode(email);
-
-    if (!resultConfirmCode.success) {
-      throw new InternalServerErrorException(
-        'An error occurred while generating the code',
-      );
-    }
-
-    return {
-      success: true,
-      data: result.data,
-      message: `The confirmation code has been sent to the mail ${email}`,
-    };
+  async register(@Request() req) {
+    const email = textField(req.body, 'email', 3, 254);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      throw new BadRequestException('Invalid email');
+    const result = await this.authService.register(
+      email,
+      textField(req.body, 'password', 8, 72),
+    );
+    if (!result.success)
+      throw new ConflictException('Не удалось зарегистрировать аккаунт');
+    await this.authService.generateAndSendConfirmCode(email, 'email');
+    return { ...result, message: 'Код отправлен на почту' };
   }
 
   @Post('confirm/code-email')
-  async confirmCodeEmail(@Request() req): Promise<IControllerResponse> {
-    const { code, userId } = req.body as { code: string; userId: string };
-
-    const result = await this.authService.confirmCode(code, userId, {
-      isEmailConfirmed: true,
-    });
-
-    if (result.error === AuthError.MAIL_CONFIRMED) {
-      throw new ConflictException('The mail has already been confirmed');
-    }
-
-    if (result.error === AuthError.CODE_INCORRECT) {
-      throw new BadRequestException('Code incorrect');
-    }
-
-    if (!result.success) {
-      throw new InternalServerErrorException(
-        'An error occurred while trying to verify the confirmation code',
-      );
-    }
-
-    return {
-      success: true,
-      message: 'Mail has been successfully confirmed',
-    };
+  async confirmEmail(@Request() req) {
+    return this.confirm(req, false);
   }
-
   @Post('confirm/code-reset-password')
-  async confirmCodeResetPassword(@Request() req): Promise<IControllerResponse> {
-    const { code, userId } = req.body as { code: string; userId: string };
-
-    const result = await this.authService.confirmCode(code, userId, {
-      isResetPassword: true,
-    });
-
-    if (result.error === AuthError.MAIL_CONFIRMED) {
-      throw new ConflictException('The mail has already been confirmed');
-    }
-
-    if (result.error === AuthError.CODE_INCORRECT) {
-      throw new BadRequestException('Code incorrect');
-    }
-
-    if (!result.success) {
-      throw new InternalServerErrorException(
-        'An error occurred while trying to verify the confirmation code',
-      );
-    }
-
-    return {
-      success: true,
-      message: 'Mail has been successfully confirmed',
-    };
+  async confirmReset(@Request() req) {
+    return this.confirm(req, true);
+  }
+  private async confirm(req, reset: boolean) {
+    const result = await this.authService.confirmCode(
+      textField(req.body, 'code', 5, 5),
+      textField(req.body, 'userId'),
+      reset ? { isResetPassword: true } : { isEmailConfirmed: true },
+    );
+    if (!result.success)
+      throw new BadRequestException('Неверный или просроченный код');
+    return { ...result, message: 'Код подтверждён' };
   }
 
   @Post('send/confirm-code')
-  async sendConfirmCodeForResetPassword(
-    @Request() req,
-  ): Promise<IControllerResponse<IUserIdResponse>> {
-    const { email } = req.body as { email: string };
-
-    const result = await this.authService.generateAndSendConfirmCode(email);
-
-    if (result.error === AuthError.INVALID_CREDENTIALS) {
-      throw new UnauthorizedException('Invalid email');
-    }
-
-    if (!result.success) {
-      throw new InternalServerErrorException(
-        'An error occurred while generating the code',
-      );
-    }
-
-    return {
-      ...result,
-      message: `The confirmation code has been sent to the mail ${email}`,
-    };
+  async sendCode(@Request() req) {
+    const purpose = req.body?.purpose === 'email' ? 'email' : 'reset';
+    const result = await this.authService.generateAndSendConfirmCode(
+      textField(req.body, 'email', 3, 254),
+      purpose,
+    );
+    if (!result.success)
+      throw new BadRequestException('Не удалось отправить код');
+    return { ...result, message: 'Код отправлен' };
   }
 
   @Post('reset/password')
-  async resetPassword(@Request() req): Promise<IControllerResponse> {
-    const { newPassword, userId } = req.body as {
-      newPassword: string;
-      userId: string;
-    };
-
-    const result = await this.authService.resetPassword(userId, newPassword);
-
-    if (result.error === AuthError.INVALID_CREDENTIALS) {
-      throw new ForbiddenException(
-        'Please confirm your email before reset password',
-      );
-    }
-
-    if (!result.success) {
-      throw new InternalServerErrorException(
-        'An error occurred when trying to change the password',
-      );
-    }
-
-    return {
-      success: true,
-      message: 'Password changed successfully',
-    };
+  async reset(@Request() req) {
+    const result = await this.authService.resetPassword(
+      textField(req.body, 'userId'),
+      textField(req.body, 'newPassword', 8, 72),
+      textField(req.body, 'resetToken', 64, 64),
+    );
+    if (!result.success)
+      throw new ForbiddenException('Подтвердите сброс пароля заново');
+    return { success: true, message: 'Пароль изменён. Войдите заново.' };
   }
 
   @Post('refresh')
-  async refresh(@Request() req): Promise<IControllerResponse<ITokenResponse>> {
-    const { refreshToken } = req.body as { refreshToken: string };
+  async refresh(@Request() req, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.refreshToken(
+      cookie(req, 'icodeme_refresh'),
+    );
+    if (!result.success || !result.data)
+      throw new UnauthorizedException('Сессия истекла');
+    setSession(res, result.data);
+    return { success: true };
+  }
 
-    const result = await this.authService.refreshToken(refreshToken);
-
-    if (!result.success) {
-      throw new UnauthorizedException('Failed to retrieve a refresh token');
-    }
-
-    return {
-      ...result,
-      message: 'Token refreshed successfully',
-    };
+  @Post('logout')
+  async logout(@Request() req, @Res({ passthrough: true }) res: Response) {
+    await this.authService.logout(cookie(req, 'icodeme_refresh'));
+    clearSession(res);
+    return { success: true };
   }
 
   @Post('validate/tokens')
-  async validateTokens(@Request() req): Promise<IControllerResponse<boolean>> {
-    const { accessToken, refreshToken } = req.body as {
-      accessToken: string;
-      refreshToken: string;
-    };
-
-    console.log(accessToken);
-
-    const result = await this.authService.validateTokens(
-      accessToken,
-      refreshToken,
-    );
-
-    return {
-      success: result.success,
-    };
+  @UseGuards(AuthGuard('jwt'))
+  async validate() {
+    return { success: true };
   }
 
   @Get('verify-token')
   @UseGuards(AuthGuard('jwt'))
   async verifyToken(@Request() req) {
-    return {
-      success: true,
-      data: req.user,
-      message: 'Token is valid',
-    };
+    return { success: true, data: req.user };
   }
 }

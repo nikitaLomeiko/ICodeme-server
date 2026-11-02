@@ -1,3 +1,9 @@
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { setSession } from '@services/authService/helpers/Auth.http';
+import {
+  GoogleStateGuard,
+  GitHubStateGuard,
+} from '@services/authService/strategy/OAuth-state.guard';
 import {
   Controller,
   Get,
@@ -20,16 +26,16 @@ export class OAuthController {
   constructor(private readonly oauthService: OauthService) {}
 
   @Get('google')
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleStateGuard)
   async googleAuth() {}
 
   @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleStateGuard)
   async googleAuthRedirect(@Request() req, @Res() res: express.Response) {
     const googleUser = req.user;
 
     const result = await this.oauthService.validateOrCreateGoogleUser(
-      googleUser.picture?.split('/')[4] || googleUser.email,
+      googleUser.googleId,
       googleUser.email,
       `${googleUser.name?.givenName || ''} ${googleUser.name?.familyName || ''}`.trim(),
       googleUser.picture,
@@ -41,17 +47,16 @@ export class OAuthController {
       return res.redirect(`${frontendUrl}/oauth/error?error=user_exists`);
     }
 
-    return res.redirect(
-      `${frontendUrl}/oauth/success?token=${result.data?.accessToken}&refreshToken=${result.data?.refreshToken}&userId=${result.data?.userId}&email=${googleUser.email}`,
-    );
+    setSession(res, result.data!);
+    return res.redirect(`${frontendUrl}/oauth/success`);
   }
 
   @Get('github')
-  @UseGuards(AuthGuard('github'))
+  @UseGuards(GitHubStateGuard)
   async githubAuth() {}
 
   @Get('github/callback')
-  @UseGuards(AuthGuard('github'))
+  @UseGuards(GitHubStateGuard)
   async githubAuthRedirect(@Request() req, @Res() res: express.Response) {
     const githubUser = req.user;
 
@@ -69,103 +74,44 @@ export class OAuthController {
       return res.redirect(`${frontendUrl}/oauth/error?error=user_exists`);
     }
 
-    return res.redirect(
-      `${frontendUrl}/oauth/success?token=${result.data?.accessToken}&refreshToken=${result.data?.refreshToken}&userId=${result.data?.userId}&email=${githubUser.email}`,
-    );
+    setSession(res, result.data!);
+    return res.redirect(`${frontendUrl}/oauth/success`);
   }
 
   @Post('telegram/verify')
   async telegramVerify(@Body() body: any, @Res() res: express.Response) {
     let data = body;
-
-    if (body.tgAuthResult) {
-      const decoded = Buffer.from(body.tgAuthResult, 'base64').toString(
-        'utf-8',
-      );
-      data = JSON.parse(decoded);
+    if (body?.tgAuthResult !== undefined) {
+      if (
+        typeof body.tgAuthResult !== 'string' ||
+        body.tgAuthResult.length > 8192
+      )
+        throw new BadRequestException();
+      try {
+        data = JSON.parse(
+          Buffer.from(body.tgAuthResult, 'base64').toString('utf8'),
+        );
+      } catch {
+        throw new BadRequestException('Invalid Telegram payload');
+      }
     }
-
-    if (data.id) {
-      data.id = String(data.id);
-    }
-
-    if (!data.id || !data.first_name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: id or first_name',
-      });
-    }
-
-    try {
-      const result = await this.oauthService.validateOrCreateTelegramUser(
-        data.id,
-        data.first_name,
-        data.last_name,
-        data.username,
-        data.photo_url,
-      );
-
-      console.log({
-        ...result,
-        data: {
-          token: result.data?.accessToken,
-          refreshToken: result.data?.refreshToken,
-          userId: result.data?.userId,
-          email: data.username,
-        },
-      });
-
-      return res.json({
-        ...result,
-        data: {
-          token: result.data?.accessToken,
-          refreshToken: result.data?.refreshToken,
-          userId: result.data?.userId,
-          email: data.username,
-        },
-      });
-    } catch (error) {
-      console.error('Telegram verify error:', error);
-      return res.status(500).json({
-        success: false,
-        message: error || 'Internal server error',
-      });
-    }
+    if (!this.oauthService.verifyTelegramAuthData(data))
+      throw new UnauthorizedException('Invalid Telegram signature');
+    const result = await this.oauthService.validateOrCreateTelegramUser(
+      String(data.id),
+      data.first_name,
+      data.last_name,
+      data.username,
+      data.photo_url,
+    );
+    if (!result.success || !result.data)
+      throw new UnauthorizedException('Telegram login failed');
+    setSession(res, result.data);
+    return res.json({ success: true, data: { userId: result.data.userId } });
   }
 
   @Post('telegram')
   async telegramAuthPost(@Body() body: any, @Res() res: express.Response) {
-    const telegramAuthData = {
-      id: body.id,
-      first_name: body.first_name,
-      last_name: body.last_name,
-      username: body.username,
-      photo_url: body.photo_url,
-      auth_date: body.auth_date,
-      hash: body.hash,
-    };
-
-    if (!this.oauthService.verifyTelegramAuthData(telegramAuthData)) {
-      const frontendUrl = telegramConfig().frontendURL;
-      return res.redirect(`${frontendUrl}/auth/error?error=invalid_data`);
-    }
-
-    const result = await this.oauthService.validateOrCreateTelegramUser(
-      telegramAuthData.id,
-      telegramAuthData.first_name,
-      telegramAuthData.last_name,
-      telegramAuthData.username,
-      telegramAuthData.photo_url,
-    );
-
-    if (!result.success) {
-      const frontendUrl = telegramConfig().frontendURL;
-      return res.redirect(`${frontendUrl}/oauth/error?error=user_exists`);
-    }
-
-    const frontendUrl = telegramConfig().frontendURL;
-    return res.redirect(
-      `${frontendUrl}/oauth/success?token=${result.data?.accessToken}&refreshToken=${result.data?.refreshToken}&userId=${result.data?.userId}&email=${telegramAuthData.username}`,
-    );
+    return this.telegramVerify(body, res);
   }
 }

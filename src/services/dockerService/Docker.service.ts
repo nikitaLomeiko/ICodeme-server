@@ -1,3 +1,4 @@
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Injectable } from '@nestjs/common';
 import { FileNode, IProject } from '@models/project';
 import { BaseFileStorage } from '@core/storage';
@@ -13,6 +14,52 @@ import { IContainerResult } from './types/DockerResult.types';
 @Injectable()
 export class DockerService {
   private path = 'data/containers';
+  async assertOwner(containerId: string, userId: string): Promise<void> {
+    if (typeof containerId !== 'string' || !/^[a-f0-9]{64}$/.test(containerId))
+      throw new BadRequestException('Invalid container id');
+    try {
+      const info = await this.docker.getContainer(containerId).inspect();
+      if (info.Config.Labels?.['project.user'] !== userId) throw new Error();
+    } catch {
+      throw new NotFoundException('Container not found');
+    }
+  }
+
+  validateProject(project: IProject): void {
+    const safe = (name: unknown) =>
+      typeof name === 'string' &&
+      name.length <= 128 &&
+      /^[a-zA-Z0-9_.-]+$/.test(name) &&
+      name !== '.' &&
+      name !== '..';
+    if (!safe(project._id) || !safe(project.userId) || !safe(project.meta.name))
+      throw new BadRequestException('Invalid project path');
+    let count = 0;
+    let bytes = 0;
+    const walk = (nodes: FileNode[], depth: number) => {
+      if (!Array.isArray(nodes) || depth > 20)
+        throw new BadRequestException('Invalid project tree');
+      for (const node of nodes) {
+        if (
+          ++count > 1000 ||
+          !safe(node.name) ||
+          node.name.toLowerCase() === 'dockerfile'
+        )
+          throw new BadRequestException('Invalid file name');
+        bytes +=
+          typeof node.content === 'string'
+            ? Buffer.byteLength(node.content)
+            : 0;
+        if (bytes > 5 * 1024 * 1024)
+          throw new BadRequestException('Project too large');
+        if (node.type === 'folder') walk(node.children || [], depth + 1);
+        else if (node.type !== 'file' || typeof node.content !== 'string')
+          throw new BadRequestException('Invalid file');
+      }
+    };
+    walk(project.dir, 0);
+  }
+
   private docker: Docker;
   private sessions: Map<
     string,
@@ -583,7 +630,7 @@ export class DockerService {
     const portMapping = this.getPortMapping(project.meta.language);
 
     try {
-      const containerName = `project-${project._id}`;
+      const containerName = `project-${project.userId}-${project._id}`;
       const existingContainers = await this.docker.listContainers({
         all: true,
         filters: {
@@ -594,11 +641,14 @@ export class DockerService {
       if (existingContainers.length > 0) {
         const existingContainerId = existingContainers[0].Id;
         const existingContainer = this.docker.getContainer(existingContainerId);
+        await this.assertOwner(existingContainerId, project.userId);
         const state = existingContainers[0].State;
 
         let oldImage: string | undefined;
         try {
           const info = await existingContainer.inspect();
+          if (info.Config.Labels?.['project.user'] !== project.userId)
+            throw new NotFoundException('Container not found');
           oldImage = info.Config && info.Config.Image;
         } catch (error) {
           console.error(

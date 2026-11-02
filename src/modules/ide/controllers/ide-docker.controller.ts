@@ -1,3 +1,5 @@
+import { UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import {
   Controller,
   Post,
@@ -13,7 +15,7 @@ import { FileNode, IProject } from '@models/project';
 import { IControllerResponse } from '@core/types/Response.type';
 
 @Controller('ide/docker')
-// @UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'))
 export class IdeDockerController {
   constructor(private readonly dockerService: DockerService) {}
 
@@ -22,6 +24,10 @@ export class IdeDockerController {
     @Request() req,
     @Body() data: { project: IProject },
   ): Promise<IControllerResponse<IContainerResult>> {
+    if (!data.project?.meta || !Array.isArray(data.project.dir))
+      throw new BadRequestException('Invalid project');
+    data.project.userId = req.user.userId;
+    this.dockerService.validateProject(data.project);
     const mockDockerCode = this.buildDockerfile(data.project.dir);
 
     const result = await this.dockerService.createAndRunContainer(
@@ -62,6 +68,9 @@ export class IdeDockerController {
     @Request() req,
     @Body() data: { containerId: string; input: string },
   ) {
+    await this.dockerService.assertOwner(data.containerId, req.user.userId);
+    if (typeof data.input !== 'string' || data.input.length > 65536)
+      throw new BadRequestException('Invalid input');
     const result = await this.dockerService.sendInputToContainer(
       data.containerId,
       data.input,
@@ -78,6 +87,7 @@ export class IdeDockerController {
 
   @Post('stop')
   async stopContainer(@Request() req, @Body() data: { containerId: string }) {
+    await this.dockerService.assertOwner(data.containerId, req.user.userId);
     const result = await this.dockerService.stopContainer(data.containerId);
 
     if (result.success) {
@@ -96,10 +106,7 @@ export class IdeDockerController {
   }
 
   @Delete()
-  async removeContainer(
-    @Request() req,
-    @Body() data: { containerId: string },
-  ) {
+  async removeContainer(@Request() req, @Body() data: { containerId: string }) {
     return this.stopContainer(req, data);
   }
 }
