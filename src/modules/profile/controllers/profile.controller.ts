@@ -35,12 +35,13 @@ export class ProfileController {
   @Post('me')
   async createNewProfile(
     @Request() req,
-    @Body() data: { profileData: IProfileData },
+    @Body() data: { profileData: Omit<IProfileData, 'chips' | 'position'> },
   ): Promise<IControllerResponse<IProfile>> {
-    const result = await this.profileService.CreateNewProfile(
-      req.user.userId,
-      data.profileData,
-    );
+    const result = await this.profileService.CreateNewProfile(req.user.userId, {
+      ...data.profileData,
+      chips: ['test', 'test'],
+      position: 'Begginer',
+    });
 
     if (!result.success) {
       throw new BadRequestException('Error when creating a profile');

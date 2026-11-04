@@ -38,14 +38,32 @@ export class StudyService {
     return { success: true, data: study };
   }
 
+  async getStudyByIdAndUserId(
+    studyId: string,
+    userId: string,
+  ): Promise<IServiceResponse<IStudy, StudyError>> {
+    const study = await this.repositoryStudy.findOne({
+      _id: studyId,
+      userId,
+    });
+
+    if (!study) {
+      return { success: false, error: StudyError.STUDY_NOT_FOUND };
+    }
+
+    return { success: true, data: study };
+  }
+
   async createNewStudy(
-    programmingLanguage: string,
+    context: string,
     userId: string,
   ): Promise<IServiceResponse<IStudy, StudyError>> {
     const now = new Date();
 
     const newStudy: IStudy = {
-      _id: generateId(programmingLanguage),
+      title: 'Generate AI',
+      description: 'Generate AI',
+      _id: generateId(context),
       userId: userId,
       levelPlanJSON: [],
       level: {
@@ -55,7 +73,7 @@ export class StudyService {
       },
       studyPlanJSON: [],
       study: {
-        programmingLanguage,
+        context,
         module: 0,
         moduleTitle: '',
         level: 0,

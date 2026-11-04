@@ -2,7 +2,7 @@ import { BaseEntity } from '@core/types/BaseEntity.abstract';
 import { INotation } from '@core/types/Notation.type';
 import { IQuiz } from './types/Quiz.types';
 
-export interface IStudy extends BaseEntity {
+export interface IStudy extends BaseEntity, INotation {
   userId: string;
   levelPlanJSON: IPosition[];
   level: IPosition;
@@ -11,7 +11,7 @@ export interface IStudy extends BaseEntity {
 }
 
 export interface IPlan {
-  programmingLanguage: string;
+  context: string;
   module: number;
   moduleTitle: string;
   level: number;
@@ -31,11 +31,16 @@ export interface IModule extends INotation {
 
 export interface ILevel extends INotation {
   steps: IStep[];
+  isCompleted: boolean;
+  isCurrent: boolean;
 }
 
 export interface IStep extends INotation {
   type: 'document' | 'code' | 'quiz' | 'exam';
+  isCompleted: boolean;
+  isCurrent: boolean;
   document?: string;
+  position: { x: number; y: number };
   code?: string;
   quiz?: IQuiz;
   exam?: IQuiz;
